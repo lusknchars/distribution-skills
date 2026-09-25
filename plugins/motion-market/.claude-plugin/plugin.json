@@ -1,6 +1,8 @@
 {
   "name": "motion-market",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Dribbble-grade UI motion videos of your app: one shape morphing through real UI states, cut to music, rendered to a seamless MP4 loop.",
-  "author": { "name": "Lucas Oliveira" }
+  "author": { "name": "Lucas Oliveira" },
+  "license": "MIT",
+  "keywords": ["motion", "video", "animation", "ui", "marketing", "playwright", "ffmpeg"]
 }

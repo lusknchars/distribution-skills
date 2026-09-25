@@ -12,8 +12,9 @@ One element never cuts: it morphs its size, radius and color from state to state
 
 ## Workflow (do it in this order)
 
-1. **Ask for inputs, then stop.** You need 8–12 UI states, a palette (the app's neutrals plus at most one accent, or pure black and white) and a song (a file, or "pick one from Mixkit"). For a real app, read its components and tokens (font, radii, colors, icon set, copy) and rebuild each state as static DOM. Never use screenshots.
-2. **Scaffold:** `sh <skill>/scripts/new-project.sh <dir>` gives you the starter (a 2-bar button → loader → check → toast). Add `example` as a second argument for the full 11-state reference. **Run everything below from `<dir>`.**
+0. **Check the machine:** `sh <skill>/scripts/doctor.sh`. It prints the exact install command for anything missing (macOS, Debian/Ubuntu, or WSL on Windows). Don't continue until it says Ready.
+1. **Ask for inputs, then stop.** You need 8–12 UI states (4-bar videos can use 5–7), a palette (the app's neutrals plus at most one accent, or pure black and white), a song (a file, or "pick one from Mixkit") and a **format**: square 1440×1440 (default), vertical 1080×1920 (Reels, TikTok, Shorts, Stories) or landscape 1920×1080 (YouTube, sites, decks). If the user says "you choose", pick the defaults and say which. For a real app, read its components and tokens (font, radii, colors, icon set, copy) and rebuild each state as static DOM. Never use screenshots.
+2. **Scaffold:** `sh <skill>/scripts/new-project.sh <dir>` gives you the starter (a 2-bar button → loader → check → toast). Add `shape-morph` (light, square, 7 bars, 11 states) or `upload-share` (dark, vertical, 4 bars, a drag-and-drop) as a second argument to start from a full example. **Run everything below from `<dir>`.**
 3. **Song** (tools read and write `./audio/`; copy a supplied file there first):
    - `python3 tools/song.py scan` ranks Mixkit tracks.
    - `grid audio/<id>.mp3 --bars N` lists the best N-bar windows. Windows overlap, one bar apart; take the top one unless the user wants a different section.
@@ -22,8 +23,9 @@ One element never cuts: it morphs its size, radius and color from state to state
    - Record the title and artist for credits.
 4. **Show the beat grid before writing code.** Use a table with columns bar.beat | time | frame | what happens | camera. Put the heavy morphs on downbeats and direct interactions (click, drag, hover, type) on the beats in between. Get the user's approval.
 5. **Build** `index.html` on `engine.js`. Read `patterns.md` for persistent elements, label clipping, counters, rubber bands, stagger and the seam.
-6. **Review stills:** `node render.mjs grid` writes `out/stills/grid_on.png` (the state *before* each change) and `grid_mid.png` (half a beat later), and prints a **bounds audit**. Read both images. Use `node render.mjs stills 9.08 9.2` for transitions. Fix anything off the grid, cramped, hard to read or listed by the audit, then re-check.
-7. **Render:** `npm run render` runs cues → mix → subframes → `encode.sh`, which ends with the lossless loop seam check. The output is `out/video.mp4`. For a live preview, open `index.html?play`.
+6. **Review stills:** `FORMAT=<format> node render.mjs grid` writes `out/stills/grid_on.png` (the state *before* each change) and `grid_mid.png` (half a beat later), and prints a **bounds audit**. Read both images. Use `node render.mjs stills 9.08 9.2` for transitions. Fix anything off the grid, cramped, hard to read or listed by the audit, then re-check.
+7. **Render:** `FORMAT=<format> npm run render` runs cues → mix → subframes → `encode.sh`, which ends with the lossless loop seam check. The output is `out/video.mp4`. For a live preview, open `index.html?play&format=<format>`.
+8. **Export:** `sh export.sh` writes `out/share.mp4` (1080 on the short side, for social), `out/preview.gif` (480 px, for READMEs and docs) and `out/poster.png` (thumbnail).
 
 ## Engine quick reference (`const M = Motion({bpm:120, bars:7})`)
 
@@ -35,6 +37,8 @@ One element never cuts: it morphs its size, radius and color from state to state
 | Liquid indicator or toggle knob stretch | boxes from `box(cx, cy, w, h)`, segments with `p:'edge'`, `prepareEdges(segs)`, then `blend(t, segs, edgePreset)` |
 | Content swap inside the morphing shape | `layer(el, vis(t, tin, tout), cam)`. The exit takes 100 ms and the enter starts after it |
 | Drag (direct manipulation) | value = f(pointer) while held, frozen at release, aftermath × `(1 - S(t - release, P.morph))` |
+| Frame | `Motion({format})` or `?format=`. Place everything around (0,0) in world units; `M.CX`/`M.CY` is the frame centre |
+| Zoom per state | `M.fit(w, h)`: the scale that makes a state fill the frame, for any format |
 | Camera | `camera(camSpring(t), liveW, liveH)` soft-caps the zoom so the shape never leaves the frame |
 | Presets | `morph snap cam draw cur glide drag pull fast slow tip` (ζ ≥ .82, overshoot ≤ 1.3%) |
 | Sound | `CUES = [[t, 'click'\|'soft'\|'grab'\|'release'\|'switch'\|'key'\|'enter'\|'check'\|'pop'\|'whoosh', gain]]`. The mixer places each sound's measured peak on `t` |
@@ -65,11 +69,12 @@ Warm-gray canvas, one UI font, neutral components plus at most one accent, used 
 | Loop check says STUTTER | The check runs on lossless frames, so it's real: something isn't a `ptrack`, a blend-driven element is visible at the seam, or a drag hasn't settled |
 | Cursor exits the frame after a drag | Add a cursor event right at release that pulls it back. The drag spring keeps travelling otherwise |
 | A wide state (a pipeline or table more than 900 px wide) reads tiny | Let it fill more of the frame (`1290/w` in `fit`, `camera(..., 1320)`) and enlarge its type. Drop small caps that end up under ~16 px on screen |
+| A scene built for one format breaks in another | Run the grid with each `FORMAT`; the bounds audit names the times. Usually a resting cursor is too far out, or the cursor travels while the camera is still zooming out: split the trip into two moves |
 | Final beat feels dead | Start the glide back 0.2–0.3 s after the last morph, and/or hover the final state |
 
 ## Deliverable
 Report back with:
-- the `out/video.mp4` path, its size, frame count and duration
+- the `out/video.mp4` path, its format, size, frame count and duration, plus the three export files
 - the loop check line
 - the song credit
 - the approved grid table

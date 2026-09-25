@@ -65,11 +65,11 @@ const shape = ptrack(SIZES);
 const shapeCol = ptrack([[beat(1), HOVER, 'snap'], [beat(2), INK]]);
 const press = ptrack([[beat(2) - .12, .965, 'snap'], [beat(2), 1, 'snap']]);
 // camera fills the frame with each state's target size (capped for tiny states)
-const fit = (w, h) => Math.min(4.2, 1120 / Math.max(w, h * 1.08));
+const fit = (w, h) => M.fit(w, h);
 const camS = ptrack(SIZES.filter((e, i) => i !== 0 && i !== 2).map(e => [e[0], fit(e[1][0], e[1][1]), 'cam']));
 
 // ── cursor (world coordinates, shape centre = 0,0). The event before the seam is still moving at t=0.
-const cursorXY = ptrack([[beat(7) + .05, [40, 18], 'glide'], [beat(2) + .1, [72, 40], 'cur'], [beat(5) + .3, [250, 70], 'cur']]);
+const cursorXY = ptrack([[beat(7) + .05, [40, 18], 'glide'], [beat(2) + .1, [72, 40], 'cur'], [beat(5) + .3, [178, 22], 'cur']]);
 const cursorPress = ptrack([[beat(2) - .12, .86, 'snap'], [beat(2), 1, 'snap']]);
 const hover = ptrack([[beat(1), 1, 'snap'], [beat(4), 0, 'snap']]);
 const checkDraw = ptrack([[beat(4), 1, 'draw'], [beat(6), 0, 'snap']]);
@@ -77,7 +77,7 @@ const checkDraw = ptrack([[beat(4), 1, 'draw'], [beat(6), 0, 'snap']]);
 function seek(t) {
   const [w, h, r0] = shape(t);
   const cam = camera(camS(t), w, h);
-  set(E.world, 'transform', `translate(720px,720px) scale(${cam.toFixed(5)})`);
+  set(E.world, 'transform', `translate(${px(M.CX)},${px(M.CY)}) scale(${cam.toFixed(5)})`);
   set(E.shape, 'left', px(-w / 2)); set(E.shape, 'top', px(-h / 2)); set(E.shape, 'width', px(w)); set(E.shape, 'height', px(h));
   set(E.shape, 'borderRadius', px(Math.min(r0, w / 2, h / 2)));
   set(E.shape, 'background', rgb(shapeCol(t)));
@@ -99,7 +99,7 @@ function seek(t) {
   layer(E.Ltoast, vis(t, beat(5), beat(7)), cam);
 
   const [wx, wy] = cursorXY(t);                                  // screen space: constant size
-  set(E.cursor, 'transform', `translate(${px(718 + cam * wx)},${px(718 + cam * wy)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
+  set(E.cursor, 'transform', `translate(${px(M.CX - 2 + cam * wx)},${px(M.CY - 2 + cam * wy)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
 }
 
 const CUES = [[beat(1), 'soft', .5], [beat(2), 'click', 1], [beat(4), 'check', 1], [beat(5), 'pop', 1]];

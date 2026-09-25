@@ -2,26 +2,28 @@
 // node render.mjs stills 2.5 9.1  → out/stills/t_*.png (any times, seconds)
 // node render.mjs cues            → out/cues.json (the scene's CUES, for tools/mix.py)
 // node render.mjs video           → frames/ (SUB subframes per frame), then: sh encode.sh
-// env: SIZE=1440 FPS=60 SUB=4 SHUTTER=0.5 WORKERS=8 PAGE=index.html
+// env: FORMAT=square|vertical|landscape FPS=60 SUB=4 SHUTTER=0.5 WORKERS=8 PAGE=index.html
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.dirname(new URL(import.meta.url).pathname);
-const SIZE = +(process.env.SIZE || 1440), FPS = +(process.env.FPS || 60), SUB = +(process.env.SUB || 4);
+const FORMAT = process.env.FORMAT || '', FPS = +(process.env.FPS || 60), SUB = +(process.env.SUB || 4);
 const SHUTTER = +(process.env.SHUTTER || 0.5), WORKERS = +(process.env.WORKERS || 8);
 const PAGE = process.env.PAGE || 'index.html';
 const mode = process.argv[2] || 'grid';
 
 const browser = await chromium.launch();
 async function page() {
-  const p = await browser.newPage({ viewport: { width: SIZE, height: SIZE }, deviceScaleFactor: 1 });
+  const p = await browser.newPage({ viewport: { width: 1440, height: 1440 }, deviceScaleFactor: 1 });
   const errs = [];
   p.on('pageerror', e => errs.push(e.message));
-  await p.goto('file://' + path.join(ROOT, PAGE));
+  await p.goto('file://' + path.join(ROOT, PAGE) + (FORMAT ? `?format=${FORMAT}` : ''));
   await p.evaluate(() => window.ready);
   if (errs.length) throw new Error('page errors: ' + errs.join(' | '));
+  const { W, H } = await p.evaluate(() => window.FRAME);
+  await p.setViewportSize({ width: W, height: H });
   return p;
 }
 const shot = async (p, t, file) => {
@@ -41,12 +43,13 @@ if (mode === 'grid' || mode === 'stills') {
       for (let i = 0; i < n; i++) { const f = path.join(dir, `${tag}_${pad(i)}.png`); await shot(p, i * b + off, f); files.push(f); }
       const cols = Math.min(8, Math.ceil(Math.sqrt(n * 1.8)));
       execFileSync('ffmpeg', ['-v', 'error', '-y', '-framerate', '1', '-i', path.join(dir, `${tag}_%02d.png`),
-        '-vf', `scale=360:360,tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`,
+        '-vf', `scale=360:-2,tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`,
         '-frames:v', '1', path.join(dir, `grid_${tag}.png`)]);
     }
     // bounds audit: every 1/30 s, the cursor and the shape must stay inside the frame
-    const bad = await p.evaluate(({ L, SIZE }) => {
-      const out = [], m = 24, inside = r => r.left >= m && r.top >= m && r.right <= SIZE - m && r.bottom <= SIZE - m;
+    const bad = await p.evaluate(({ L }) => {
+      const { W, H } = window.FRAME;
+      const out = [], m = 24, inside = r => r.left >= m && r.top >= m && r.right <= W - m && r.bottom <= H - m;
       for (let t = 0; t < L; t += 1 / 30) {
         window.seek(t);
         for (const id of ['cursor', 'shape']) {
@@ -56,7 +59,7 @@ if (mode === 'grid' || mode === 'stills') {
         }
       }
       return out;
-    }, { L, SIZE });
+    }, { L });
     console.log(bad.length ? `BOUNDS: ${bad.length} samples outside the frame (fix cursor world positions or the camera fit):\n  ` + bad.slice(0, 12).join('\n  ') : 'bounds: cursor and shape stay inside the frame');
     console.log(`grid: ${n} beats → out/stills/grid_on.png (on the beat = the state BEFORE each change) and grid_mid.png (half a beat later = settling)`);
   } else {

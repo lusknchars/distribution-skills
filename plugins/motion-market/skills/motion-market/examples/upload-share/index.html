@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Upload Share</title>
+<style>
+/* Dark, vertical (1080×1920) example: 4 bars @120 = 8 s. One accent (violet), only on active values. */
+@font-face{font-family:Geist;src:url(fonts/Geist-Variable.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:GeistMono;src:url(fonts/GeistMono-Variable.woff2) format('woff2');font-weight:100 900}
+:root{--bg:#0a0a0b;--panel:#151518;--raised:#1f1f23;--line:#2a2a2f;--ink:#f4f4f5;--muted:#9a9aa3;--faint:#62626b;--accent:#7c5cff}
+html,body{margin:0;background:var(--bg)}
+#frame{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--bg);font-family:Geist,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#shape{position:absolute;overflow:hidden;transform-origin:50% 50%}
+#sc{position:absolute;left:50%;top:50%;width:0;height:0}
+.a{position:absolute;white-space:nowrap}
+.v{transform:translateY(-50%);line-height:1}
+.vr{transform:translate(-100%,-50%);line-height:1}
+.vc{transform:translate(-50%,-50%);line-height:1}
+.layer{position:absolute;left:0;top:0;width:0;height:0}
+.mono{font-family:GeistMono,monospace}
+svg{overflow:visible;display:block}
+.ic{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#cursor{position:absolute;left:0;top:0;width:30px;height:40px;transform-origin:0 0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="world">
+    <div id="shape"><div id="sc">
+      <!-- button -->
+      <div id="Lbutton" class="layer">
+        <svg class="ic" viewBox="0 0 24 24" style="left:-82px;top:0"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>
+        <div id="btnLabel" class="a v" style="left:-58px;top:0;font-size:32px;font-weight:600;letter-spacing:-.01em">Upload</div>
+      </div>
+      <!-- dropzone -->
+      <div id="Ldrop" class="layer">
+        <svg class="a" style="left:-244px;top:-184px" width="488" height="368" viewBox="0 0 488 368">
+          <rect id="dash" x="1" y="1" width="486" height="366" rx="20" fill="none" stroke-width="2" stroke-dasharray="9 9"/>
+        </svg>
+        <div id="dropIcon" class="a" style="left:0;top:-44px;transform:scale(1.7)"><svg class="ic" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg></div>
+        <div class="a vc" style="left:0;top:22px;font-size:26px;font-weight:600">Drop files here</div>
+        <div class="a vc" style="left:0;top:60px;font-size:19px;color:var(--muted)">PDF, images or video up to 2 GB</div>
+      </div>
+      <!-- progress row -->
+      <div id="Lrow" class="layer">
+        <div class="a" style="left:-248px;top:-32px;width:64px;height:64px;border-radius:16px;background:var(--raised)">
+          <svg class="ic" viewBox="0 0 24 24" style="left:32px;top:32px"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        </div>
+        <div class="a v" style="left:-166px;top:-18px;font-size:23px;font-weight:600">Q3-report.pdf</div>
+        <div id="rowSubA" class="a v" style="left:-166px;top:14px;font-size:18px;color:var(--muted)">2.4 MB · uploading</div>
+        <div id="rowSubB" class="a v" style="left:-166px;top:14px;font-size:18px;color:var(--muted)">2.4 MB · uploaded</div>
+        <div id="pct" class="a vr mono" style="left:256px;top:-18px;font-size:22px"></div>
+        <div id="done" class="a" style="left:228px;top:-32px;width:28px;height:28px;border-radius:14px;background:var(--accent)">
+          <svg class="ic" viewBox="0 0 24 24" style="left:14px;top:14px;transform:scale(.7);stroke-width:2.6"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
+        <div class="a" style="left:-166px;top:40px;width:422px;height:6px;border-radius:3px;background:var(--line)"></div>
+        <div id="bar" class="a" style="left:-166px;top:40px;height:6px;border-radius:3px;background:var(--accent)"></div>
+      </div>
+      <!-- share card -->
+      <div id="Lshare" class="layer">
+        <div class="a v" style="left:-240px;top:-122px;font-size:28px;font-weight:600;letter-spacing:-.01em">Share</div>
+        <div class="a v" style="left:-240px;top:-88px;font-size:19px;color:var(--muted)">Q3-report.pdf</div>
+        <div class="a" style="left:-240px;top:-58px;width:480px;height:1px;background:var(--line)"></div>
+        <svg class="ic" viewBox="0 0 24 24" style="left:-228px;top:-10px;color:var(--muted)"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+        <div class="a v" style="left:-202px;top:-10px;font-size:21px;font-weight:500">Anyone with the link</div>
+        <div id="track" class="a" style="left:144px;top:-38px;width:96px;height:56px;border-radius:28px"></div>
+        <div id="knob" class="a" style="background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>
+        <div class="a" style="left:-240px;top:44px;width:328px;height:60px;border-radius:14px;background:var(--raised)"></div>
+        <div id="linkOff" class="a v" style="left:-220px;top:74px;font-size:18px;color:var(--faint)">Link sharing is off</div>
+        <div id="linkOn" class="a v mono" style="left:-220px;top:74px;font-size:17px">motion.link/q3-report</div>
+        <div id="copyBtn" class="a" style="left:104px;top:44px;width:136px;height:60px;border-radius:14px;background:var(--ink)">
+          <div class="a vc" style="left:68px;top:30px;font-size:19px;font-weight:600;color:var(--bg)">Copy link</div>
+        </div>
+      </div>
+      <!-- toast -->
+      <div id="Ltoast" class="layer">
+        <div class="a" style="left:-176px;top:-16px;width:32px;height:32px;border-radius:16px;background:var(--accent)">
+          <svg class="ic" viewBox="0 0 24 24" style="left:16px;top:16px;transform:scale(.75)"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
+        <div class="a v" style="left:-130px;top:0;font-size:22px;font-weight:500">Link copied</div>
+        <div id="openBtn" class="a vr" style="left:176px;top:0;font-size:20px;font-weight:500;color:var(--muted)">Open</div>
+      </div>
+    </div></div>
+    <!-- the dragged file lives in the world, outside the shape, so it can travel in from off the card -->
+    <div id="chip" class="a" style="width:250px;height:64px;border-radius:16px;background:var(--raised);box-shadow:inset 0 0 0 1px var(--line),0 12px 30px rgba(0,0,0,.45)">
+      <svg class="ic" viewBox="0 0 24 24" style="left:32px;top:32px"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+      <div class="a v" style="left:56px;top:32px;font-size:19px;font-weight:500">Q3-report.pdf</div>
+    </div>
+  </div>
+  <svg id="cursor" viewBox="-2 -2 26 38"><path d="M0 0V29.5L7.2 22.6L12 33.4L16.6 31.4L11.9 20.8H21.8Z" fill="#f4f4f5" stroke="#0a0a0b" stroke-width="2" stroke-linejoin="round"/></svg>
+</div>
+<script src="engine.js"></script>
+<script>
+const M = Motion({ bpm: 120, bars: 4, format: 'vertical' });
+const { L, beat, clamp, lerp, easeOut, S, P, ptrack, blend, prepareEdges, edgePreset, box, vis, camera, set, px, rgb, rect, layer } = M;
+const $ = id => document.getElementById(id);
+const E = Object.fromEntries(['world', 'shape', 'Lbutton', 'btnLabel', 'Ldrop', 'dash', 'dropIcon', 'Lrow', 'rowSubA', 'rowSubB', 'pct', 'done', 'bar',
+  'Lshare', 'track', 'knob', 'linkOff', 'linkOn', 'copyBtn', 'Ltoast', 'openBtn', 'chip', 'cursor'].map(id => [id, $(id)]));
+const PANEL = [21, 21, 24], RAISED = [31, 31, 35], HOVER = [42, 42, 47], LINE = [42, 42, 47], FAINT = [98, 98, 107], ACCENT = [124, 92, 255];
+
+// ── the shape ──
+const SIZES = [
+  [beat(1), [312, 100, 50], 'snap'], [beat(2), [520, 400, 32]], [beat(5), [560, 128, 28]],
+  [beat(8), [560, 340, 32]], [beat(12), [420, 96, 48]], [beat(14), [296, 96, 48]],
+];
+const shape = ptrack(SIZES);
+const shapeCol = ptrack([[beat(1), HOVER, 'snap'], [beat(2), PANEL], [beat(14), RAISED]]);
+const press = ptrack([[beat(2) - .12, .965, 'snap'], [beat(2), 1, 'snap']]);
+const camS = ptrack(SIZES.filter((e, i) => i).map(e => [e[0], M.fit(e[1][0], e[1][1]), 'cam']));
+
+// ── cursor ──
+const cursorXY = ptrack([
+  [beat(14) + .25, [52, 22], 'glide'],   // back onto the button across the seam
+  [beat(2) + .1, [120, 150], 'cur'],     // two short moves: the camera is still zooming out
+  [beat(2) + .32, [250, 234], 'cur'],    // to the file waiting just below the card
+  [beat(3) + .05, [44, 30], 'drag'],     // drag it onto the dropzone
+  [beat(5) + .1, [150, 96], 'cur'],
+  [beat(8) + .1, [202, -6], 'cur'],      // toggle
+  [beat(9) + .1, [178, 80], 'cur'],      // Copy link
+  [beat(11) + .1, [230, 130], 'cur'],
+  [beat(12) + .2, [168, 8], 'cur'],      // hover Open
+]);
+const cursorPress = ptrack([[beat(2) - .12, .86, 'snap'], [beat(2), 1, 'snap'], [beat(3), .86, 'snap'], [beat(5), 1, 'snap'],
+  [beat(9) - .08, .86, 'snap'], [beat(9), 1, 'snap'], [beat(11) - .08, .86, 'snap'], [beat(11), 1, 'snap']]);
+const hover = ptrack([[beat(1), 1, 'snap'], [beat(4), 0, 'snap']]);
+
+// ── drag: the chip follows the pointer while held, then drops into the card ──
+const GRAB = beat(3), DROP = beat(5);
+const chipOffset = [-92, -14];   // the pointer holds the chip near its right end
+const inZone = t => { const [x, y] = cursorXY(t); return t > GRAB && t < DROP && Math.abs(x + chipOffset[0]) < 260 && Math.abs(y) < 200; };
+
+// ── toggle knob: liquid edges ──
+const KNOB = prepareEdges([
+  { T: -1, f: () => box(172, -10, 44, 44), p: 'snap' },
+  { T: beat(9) - .08, f: () => box(178, -10, 56, 44), p: 'snap' },
+  { T: beat(9), f: () => box(212, -10, 44, 44), p: 'edge' },
+]);
+const trackCol = ptrack([[beat(9), ACCENT, 'snap'], [beat(13), LINE, 'snap']]);
+const hotT = ptrack([[beat(4) - .1, 1, 'snap'], [beat(5), 0, 'snap']]);
+const copyPress = ptrack([[beat(11) - .08, .94, 'snap'], [beat(11), 1, 'snap']]);
+
+function seek(t) {
+  const [w, h, r] = shape(t);
+  const cam = camera(camS(t), w, h);
+  set(E.world, 'transform', `translate(${px(M.CX)},${px(M.CY)}) scale(${cam.toFixed(5)})`);
+  set(E.shape, 'left', px(-w / 2)); set(E.shape, 'top', px(-h / 2)); set(E.shape, 'width', px(w)); set(E.shape, 'height', px(h));
+  set(E.shape, 'borderRadius', px(Math.min(r, w / 2, h / 2)));
+  set(E.shape, 'background', rgb(shapeCol(t)));
+  set(E.shape, 'transform', `scale(${press(t).toFixed(4)})`);
+  set(E.shape, 'boxShadow', `inset 0 0 0 ${px(1.2 / cam)} #2a2a2f, 0 24px 70px rgba(0,0,0,.5)`);
+
+  layer(E.Lbutton, vis(t, beat(14), beat(2) + L), cam);
+  set(E.btnLabel, 'transform', `translate(${px(4 * clamp(hover(t), 0, 1))},-50%)`);
+
+  // dropzone: dashed border lights up while the file hovers it
+  layer(E.Ldrop, vis(t, beat(2), beat(5)), cam);
+  const hot = hotT(t);
+  set(E.dash, 'stroke', rgb(FAINT.map((v, i) => lerp(v, ACCENT[i], clamp(hot, 0, 1)))));
+  set(E.dash, 'strokeDashoffset', (-t * 24).toFixed(2));
+  set(E.dropIcon, 'color', rgb([154, 154, 163].map((v, i) => lerp(v, ACCENT[i], clamp(hot, 0, 1)))));
+  set(E.dropIcon, 'transform', `translate(0, ${px(-6 * clamp(hot, 0, 1))}) scale(1.7)`);
+
+  // chip: appears under the pointer, follows it while held, shrinks into the card on drop
+  const [cx, cy] = cursorXY(t);
+  const chipIn = easeOut((t - (GRAB - .2)) / .2), chipOut = 1 - easeOut((t - DROP) / .14);
+  const ca = Math.min(chipIn, chipOut) * (t < GRAB + L && t > GRAB - .25 ? 1 : 0);
+  const sc = (.9 + .1 * chipIn) * (1 - .25 * (1 - chipOut));
+  set(E.chip, 'left', px(cx + chipOffset[0] - 125)); set(E.chip, 'top', px(cy + chipOffset[1] - 32));
+  set(E.chip, 'opacity', ca.toFixed(3)); set(E.chip, 'visibility', ca < .002 ? 'hidden' : 'visible');
+  set(E.chip, 'transform', `scale(${sc.toFixed(4)}) rotate(${(inZone(t) ? 0 : -3 * chipIn).toFixed(2)}deg)`);
+
+  // progress row
+  layer(E.Lrow, vis(t, beat(5), beat(8)), cam);
+  const p = clamp(easeOut((t - beat(5) - .1) / 1.0), 0, 1);
+  E.pct.textContent = Math.round(p * 100) + '%';
+  set(E.bar, 'width', px(422 * p));
+  const fin = clamp(S(t - beat(7), P.snap), 0, 1.02);
+  set(E.pct, 'opacity', (1 - clamp(fin * 2, 0, 1)).toFixed(3));
+  set(E.done, 'opacity', clamp(fin, 0, 1).toFixed(3)); set(E.done, 'transform', `translateY(18px) scale(${(.6 + .4 * fin).toFixed(4)})`);
+  set(E.rowSubA, 'opacity', (1 - clamp(fin * 2, 0, 1)).toFixed(3)); set(E.rowSubB, 'opacity', clamp(fin * 2 - 1, 0, 1).toFixed(3));
+
+  // share card + liquid toggle
+  layer(E.Lshare, vis(t, beat(8), beat(12)), cam);
+  const kn = blend(t, KNOB, edgePreset);
+  rect(E.knob, kn.x1, kn.y1, kn.x2, kn.y2); set(E.knob, 'borderRadius', px(Math.min(kn.x2 - kn.x1, kn.y2 - kn.y1) / 2));
+  set(E.track, 'background', rgb(trackCol(t)));
+  const on = easeOut((t - beat(10)) / .2);
+  set(E.linkOff, 'opacity', (1 - clamp(on * 2, 0, 1)).toFixed(3));
+  set(E.linkOn, 'opacity', on.toFixed(3)); set(E.linkOn, 'filter', on < .98 ? `blur(${((1 - on) * 4).toFixed(2)}px)` : 'none');
+  set(E.copyBtn, 'transform', `scale(${copyPress(t).toFixed(4)})`);
+
+  layer(E.Ltoast, vis(t, beat(12), beat(14)), cam);
+  set(E.openBtn, 'color', t > beat(13) - .05 && t < beat(14) ? '#f4f4f5' : '#9a9aa3');
+
+  set(E.cursor, 'transform', `translate(${px(M.CX - 2 + cam * cx)},${px(M.CY - 2 + cam * cy)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
+}
+
+const CUES = [[beat(1), 'soft', .5], [beat(2), 'click', 1], [beat(3), 'grab', 1], [beat(4), 'soft', .5], [beat(5), 'release', 1],
+  [beat(7), 'check', 1], [beat(9), 'switch', 1], [beat(10), 'soft', .5], [beat(11), 'click', 1], [beat(12), 'pop', 1], [beat(13), 'soft', .4]];
+mount({ M, seek, cues: CUES });
+</script>
+</body>
+</html>

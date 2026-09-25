@@ -1,6 +1,12 @@
 // UI morph motion engine. Everything is a pure function of time: seek(t) may be called in any order.
 // Usage: const M = Motion({ bpm: 120, bars: 7 });  →  M.L is the loop length in seconds.
-function Motion({ bpm = 120, bars = 7, beatsPerBar = 4 } = {}) {
+// Frame: square 1440×1440 by default; ?format=vertical (1080×1920) | landscape (1920×1080) | square, or ?w=&h=.
+// Build the scene in world units around (0,0) and let M.fit / M.camera frame it — then every format works.
+const FORMATS = { square: [1440, 1440], vertical: [1080, 1920], landscape: [1920, 1080] };
+function Motion({ bpm = 120, bars = 7, beatsPerBar = 4, format = 'square' } = {}) {
+  const q = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+  const [W, H] = q.get('w') ? [+q.get('w'), +q.get('h')] : FORMATS[q.get('format') || format];
+  const CX = W / 2, CY = H / 2, REF = 1440;
   const L = bars * beatsPerBar * 60 / bpm;
   const beat = n => n * 60 / bpm;                 // beat index → seconds (use for every cue)
   const mod = (t, m) => ((t % m) + m) % m;
@@ -105,8 +111,13 @@ function Motion({ bpm = 120, bars = 7, beatsPerBar = 4 } = {}) {
 
   // Camera: the zoom spring may lag the morph; soft-min against the shape's live size so it never
   // outgrows the frame. frame = output size in px, margin = the largest the shape may appear.
-  function camera(camSpring, w, h, margin = 1300) {
-    const cap = margin / Math.max(w, h), k = .06;
+  // fit(w, h): the zoom that makes a state of that size fill the frame (tiny states capped at `max`).
+  // tall frames are width-bound, so fill more; the zoom cap for tiny states scales with the frame's short side
+  function fit(w, h, { fill = W < H ? .86 : 1120 / REF, max = 4.2 * Math.min(W, H) / REF } = {}) {
+    return Math.min(max, fill * W / w, fill * H / (h * 1.08));
+  }
+  function camera(camSpring, w, h, fill = 1300 / REF) {
+    const cap = Math.min(fill * W / w, fill * H / h), k = .06;
     return -k * Math.log(Math.exp(-camSpring / k) + Math.exp(-cap / k));
   }
 
@@ -122,12 +133,15 @@ function Motion({ bpm = 120, bars = 7, beatsPerBar = 4 } = {}) {
     set(el, 'filter', b > .04 ? `blur(${b.toFixed(2)}px)` : 'none');
   }
 
-  return { L, bpm, beat, mod, clamp, lerp, easeOut, P, S, ptrack, blend, prepareEdges, edgePreset, box, vis, dragValue, camera, set, px, rgb, rect, layer };
+  return { W, H, CX, CY, L, bpm, beat, fit, mod, clamp, lerp, easeOut, P, S, ptrack, blend, prepareEdges, edgePreset, box, vis, dragValue, camera, set, px, rgb, rect, layer };
 }
 
 // Standard page contract used by render.mjs: window.L, window.seek(t), window.ready, window.CUES.
 function mount({ M, seek, cues = [], soundtrack = 'out/soundtrack.wav', init = () => {} }) {
   window.L = M.L;
+  window.FRAME = { W: M.W, H: M.H };
+  const fr = document.getElementById('frame');
+  if (fr) { fr.style.width = M.W + 'px'; fr.style.height = M.H + 'px'; }
   window.BPM = M.bpm;
   window.CUES = cues;
   window.seek = t => seek(M.mod(t, M.L));

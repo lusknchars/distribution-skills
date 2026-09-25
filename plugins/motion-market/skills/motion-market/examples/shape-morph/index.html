@@ -145,7 +145,7 @@ const shapeWHR = ptrack(SIZES.map(e => [e[0], [e[1], e[2], e[3]], e[4] || 'morph
 const shapeCol = ptrack([[0.5, HOVER, 'snap'], [1.0, INK], [4.0, WHITE], [8.0, OFF], [8.5, BLUE, 'snap'], [9.0, WHITE, 'snap'], [13.0, INK]]);
 const shapePress = ptrack([[0.88, .965, 'snap'], [1.0, 1, 'snap'], [3.42, .97, 'snap'], [3.5, 1, 'snap']]);
 
-const fit = (w, h) => Math.min(4.2, 1120 / Math.max(w, h * 1.08));
+const fit = (w, h) => M.fit(w, h);
 const camS = ptrack(SIZES.filter(e => ![0.5, 2.0, 12.5, 12.625].includes(e[0])).map(e => [e[0], fit(e[1], e[2]), 'cam']));
 
 // ─── cursor ────────────────────────────────────────────────────────
@@ -157,7 +157,7 @@ const cursorXY = ptrack([
   [4.6, [-78, 163], 'cur'],     // progress knob
   [5.05, [96, 163], 'drag'],    // scrub
   [6.08, [44, 3], 'cur'],       // volume knob
-  [6.55, [340, 5], 'pull'],     // drag past max
+  [6.55, [320, 5], 'pull'],     // drag past max
   [7.56, [150, 50], 'cur'],
   [8.02, [50, 10], 'cur'],      // toggle
   [9.05, [4, 10], 'cur'],       // Week
@@ -165,7 +165,7 @@ const cursorXY = ptrack([
   [10.52, [-5, 52], 'cur'],     // hover Jul
   [11.3, [177, -16], 'cur'],    // hover Oct (peak)
   [11.62, [236, -114], 'cur'],  // ⌘K button
-  [12.1, [350, 120], 'cur'],
+  [12.1, [326, 120], 'cur'],
   [12.9, [206, 84], 'cur'],
 ]);
 const cursorPress = ptrack([
@@ -323,7 +323,8 @@ function seek(t) {
   const sx = ext / 2;
   // soft-min: the camera may lag the morph, but the shape never outgrows the frame
   const cam = camera(cam0, w, h);
-  set(E.world, 'transform', `translate(720px,720px) scale(${cam.toFixed(5)})`);
+  const panX = -cam * sx * .5;   // the camera follows half of the rubber-band stretch
+  set(E.world, 'transform', `translate(${px(M.CX + panX)},${px(M.CY)}) scale(${cam.toFixed(5)})`);
   set(E.shape, 'left', px(sx - w / 2)); set(E.shape, 'top', px(-h / 2));
   set(E.shape, 'width', px(w)); set(E.shape, 'height', px(h));
   set(E.shape, 'borderRadius', px(r));
@@ -460,7 +461,7 @@ function seek(t) {
 
   // cursor lives in screen space: constant size, world position through the camera
   const [wx, wy] = cursorXY(t);
-  const scx = 720 + cam * wx, scy = 720 + cam * wy;
+  const scx = M.CX + panX + cam * wx, scy = M.CY + cam * wy;
   set(E.cursor, 'transform', `translate(${px(scx - 2)},${px(scy - 2)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
 }
 
