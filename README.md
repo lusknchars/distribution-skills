@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/banner.png" alt="Distribution Skills: Claude Code skills that turn a product into the assets that sell it" width="100%"></p>
+
 # Distribution Skills
 
 Skills for Claude Code that turn a product into the assets that sell it.
@@ -19,8 +21,6 @@ Or copy (or symlink) `plugins/motion-market/skills/motion-market` into `~/.claud
 
 ## Motion Market
 
-https://github.com/lusknchars/distribution-skills/raw/main/docs/shape-morph.mp4
-
 Ask for something like *"make a motion video for our app"*. The skill:
 
 1. Asks for 8–12 UI states, a palette and a song. For your own app, it reads your code for the font, colors, radii, icons and copy.
@@ -31,5 +31,3 @@ Ask for something like *"make a motion video for our app"*. The skill:
 6. Renders 4 motion-blur subframes per frame with Playwright, blends them with ffmpeg, places each UI sound by its measured peak, and checks the loop seam on lossless frames.
 
 **Requirements:** Node 18+, Python 3 with numpy, and ffmpeg. Playwright's Chromium is installed by the scaffold script.
-
-The example video uses "Brainiac" by Alejandro Magaña ([Mixkit](https://mixkit.co), Mixkit Stock Music Free License).
