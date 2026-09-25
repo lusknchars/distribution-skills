@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UI Morph</title>
+<style>
+/* Swap to the app's font + tokens. One UI font. Colors: the app's neutrals + at most one accent. */
+@font-face{font-family:Geist;src:url(fonts/Geist-Variable.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:GeistMono;src:url(fonts/GeistMono-Variable.woff2) format('woff2');font-weight:100 900}
+:root{--bg:#e8e6e1;--ink:#0e0e0e;--muted:#8a867e;--accent:#2555ff}
+html,body{margin:0;background:var(--bg)}
+#frame{position:relative;width:1440px;height:1440px;overflow:hidden;background:var(--bg);font-family:Geist,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#shape{position:absolute;overflow:hidden;transform-origin:50% 50%}
+#sc{position:absolute;left:50%;top:50%;width:0;height:0}   /* children use shape-centre coordinates */
+.a{position:absolute;white-space:nowrap}
+.v{transform:translateY(-50%);line-height:1}
+.vc{transform:translate(-50%,-50%);line-height:1}
+.layer{position:absolute;left:0;top:0;width:0;height:0}
+svg{overflow:visible;display:block}
+.ic{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#cursor{position:absolute;left:0;top:0;width:30px;height:40px;transform-origin:0 0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.22))}
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="world">
+    <div id="shape"><div id="sc">
+      <!-- one .layer per state; content is static DOM, seek() only moves/fades it -->
+      <div id="Lbutton" class="layer">
+        <div id="btnLabel" class="a vc" style="color:#fff;font-size:32px;font-weight:600">Continue</div>
+        <svg id="btnArrow" class="ic" viewBox="0 0 24 24" style="color:#fff"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+      <div id="Lloader" class="layer">
+        <svg class="a" style="left:-48px;top:-48px" width="96" height="96" viewBox="-48 -48 96 96">
+          <circle r="27" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="5"/>
+          <circle id="arc" r="27" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" pathLength="100"/>
+          <path id="checkPath" d="M-11 1 L-3 9 L12 -8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 2"/>
+        </svg>
+      </div>
+      <div id="Ltoast" class="layer">
+        <div class="a" style="left:-186px;top:-16px;width:32px;height:32px;border-radius:16px;background:var(--accent)">
+          <svg class="ic" viewBox="0 0 24 24" style="left:16px;top:16px;color:#fff;transform:scale(.75)"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
+        <div class="a v" style="left:-140px;top:0;color:#fff;font-size:21px;font-weight:500">Payment sent</div>
+        <div class="a" style="left:128px;top:0;color:#8f8b84;font-size:19px;font-weight:500;transform:translateY(-50%);line-height:1">Undo</div>
+      </div>
+    </div></div>
+  </div>
+  <svg id="cursor" viewBox="-2 -2 26 38"><path d="M0 0V29.5L7.2 22.6L12 33.4L16.6 31.4L11.9 20.8H21.8Z" fill="#0e0e0e" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+</div>
+<script src="engine.js"></script>
+<script>
+// 2 bars @120 = 4 s = 8 beats. Beat n is at M.beat(n). Morphs land ON beats; presses lead them by ~0.1 s.
+const M = Motion({ bpm: 120, bars: 2 });
+const { L, beat, clamp, lerp, easeOut, S, P, ptrack, vis, camera, set, px, rgb, layer } = M;
+const INK = [14, 14, 14], HOVER = [38, 38, 38];
+const $ = id => document.getElementById(id);
+const E = Object.fromEntries(['world', 'shape', 'sc', 'Lbutton', 'btnLabel', 'btnArrow', 'Lloader', 'arc', 'checkPath', 'Ltoast', 'cursor'].map(id => [id, $(id)]));
+
+// ── the one shape: [time, [w, h, radius], preset]. Cyclic: the last target is the state at t=0.
+const SIZES = [[beat(1), [316, 100, 50], 'snap'], [beat(2), [96, 96, 48]], [beat(4), [104, 104, 52], 'snap'],
+               [beat(5), [420, 96, 48]], [beat(7), [300, 96, 48]]];
+const shape = ptrack(SIZES);
+const shapeCol = ptrack([[beat(1), HOVER, 'snap'], [beat(2), INK]]);
+const press = ptrack([[beat(2) - .12, .965, 'snap'], [beat(2), 1, 'snap']]);
+// camera fills the frame with each state's target size (capped for tiny states)
+const fit = (w, h) => Math.min(4.2, 1120 / Math.max(w, h * 1.08));
+const camS = ptrack(SIZES.filter((e, i) => i !== 0 && i !== 2).map(e => [e[0], fit(e[1][0], e[1][1]), 'cam']));
+
+// ── cursor (world coordinates, shape centre = 0,0). The event before the seam is still moving at t=0.
+const cursorXY = ptrack([[beat(7) + .05, [40, 18], 'glide'], [beat(2) + .1, [72, 40], 'cur'], [beat(5) + .3, [250, 70], 'cur']]);
+const cursorPress = ptrack([[beat(2) - .12, .86, 'snap'], [beat(2), 1, 'snap']]);
+const hover = ptrack([[beat(1), 1, 'snap'], [beat(4), 0, 'snap']]);
+const checkDraw = ptrack([[beat(4), 1, 'draw'], [beat(6), 0, 'snap']]);
+
+function seek(t) {
+  const [w, h, r0] = shape(t);
+  const cam = camera(camS(t), w, h);
+  set(E.world, 'transform', `translate(720px,720px) scale(${cam.toFixed(5)})`);
+  set(E.shape, 'left', px(-w / 2)); set(E.shape, 'top', px(-h / 2)); set(E.shape, 'width', px(w)); set(E.shape, 'height', px(h));
+  set(E.shape, 'borderRadius', px(Math.min(r0, w / 2, h / 2)));
+  set(E.shape, 'background', rgb(shapeCol(t)));
+  set(E.shape, 'transform', `scale(${press(t).toFixed(4)})`);
+  set(E.shape, 'boxShadow', `0 14px 40px rgba(0,0,0,.08)`);
+
+  layer(E.Lbutton, vis(t, beat(7), beat(2) + L), cam);          // window wraps the seam
+  const hv = hover(t);
+  set(E.btnLabel, 'left', px(-16 * hv)); set(E.btnArrow, 'left', px(lerp(56, 76, hv))); set(E.btnArrow, 'opacity', clamp(hv, 0, 1).toFixed(3));
+
+  layer(E.Lloader, vis(t, beat(2), beat(5)), cam);
+  const lp = easeOut(clamp((t - beat(2)) / (beat(4) - beat(2)), 0, 1));
+  const len = lerp(14, 100, lp);
+  set(E.arc, 'strokeDasharray', `${len.toFixed(2)} ${(100 - len + .001).toFixed(2)}`);
+  set(E.arc, 'transform', `rotate(${(-90 + (t - beat(2)) * 420 * (1 - lp * .6)).toFixed(2)}deg)`);
+  const cd = clamp(checkDraw(t), 0, 1);
+  set(E.checkPath, 'strokeDashoffset', (1 - cd).toFixed(4)); set(E.checkPath, 'opacity', cd > .003 ? '1' : '0');
+
+  layer(E.Ltoast, vis(t, beat(5), beat(7)), cam);
+
+  const [wx, wy] = cursorXY(t);                                  // screen space: constant size
+  set(E.cursor, 'transform', `translate(${px(718 + cam * wx)},${px(718 + cam * wy)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
+}
+
+const CUES = [[beat(1), 'soft', .5], [beat(2), 'click', 1], [beat(4), 'check', 1], [beat(5), 'pop', 1]];
+mount({ M, seek, cues: CUES });
+</script>
+</body>
+</html>

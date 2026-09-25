@@ -1,0 +1,9 @@
+{
+  "name": "ui-morph-video",
+  "private": true,
+  "scripts": {
+    "grid": "node render.mjs grid",
+    "render": "node render.mjs cues && python3 tools/mix.py && node render.mjs video && sh encode.sh"
+  },
+  "dependencies": { "geist": "^1.7.2", "playwright": "^1.63.0" }
+}

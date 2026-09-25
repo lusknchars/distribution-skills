@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shape Morph</title>
+<style>
+@font-face{font-family:Geist;src:url(fonts/Geist-Variable.woff2) format('woff2');font-weight:100 900}
+@font-face{font-family:GeistMono;src:url(fonts/GeistMono-Variable.woff2) format('woff2');font-weight:100 900}
+html,body{margin:0;background:#e8e6e1}
+#frame{position:relative;width:1440px;height:1440px;overflow:hidden;background:#e8e6e1;font-family:Geist,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"tnum" 1}
+#world{position:absolute;left:0;top:0;transform-origin:0 0}
+#shape{position:absolute;overflow:hidden;transform-origin:50% 50%}
+#sc{position:absolute;left:50%;top:50%;width:0;height:0}
+.a{position:absolute;white-space:nowrap}
+.v{transform:translateY(-50%);line-height:1}
+.vr{transform:translate(-100%,-50%);line-height:1}
+.vc{transform:translate(-50%,-50%);line-height:1}
+.layer{position:absolute;left:0;top:0;width:0;height:0}
+svg{overflow:visible;display:block}
+.ic{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.mono{font-family:GeistMono,monospace}
+#cursor{position:absolute;left:0;top:0;width:30px;height:40px;transform-origin:0 0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.22))}
+</style>
+</head>
+<body>
+<div id="frame">
+  <div id="world">
+    <div id="shape"><div id="sc">
+      <div id="art" class="a"><svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect x="-100" y="-100" width="300" height="300" fill="#141414"/><g id="rings" fill="none" stroke="#fff"></g></svg></div>
+      <div id="rail" class="a"></div>
+      <div id="fill" class="a"></div>
+
+      <!-- button -->
+      <div id="Lbutton" class="layer">
+        <div id="btnLabel" class="a vc" style="color:#fff;font-size:32px;font-weight:600;letter-spacing:-.01em">Continue</div>
+        <svg id="btnArrow" class="ic" viewBox="0 0 24 24" style="color:#fff"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </div>
+
+      <!-- loader + check -->
+      <div id="Lloader" class="layer">
+        <svg class="a" style="left:-48px;top:-48px" width="96" height="96" viewBox="-48 -48 96 96">
+          <circle cx="0" cy="0" r="27" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="5"/>
+          <circle id="arc" cx="0" cy="0" r="27" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" pathLength="100"/>
+          <path id="checkPath" d="M-11 1 L-3 9 L12 -8" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/>
+        </svg>
+      </div>
+
+      <!-- dynamic island -->
+      <div id="Lisland" class="layer">
+        <div class="a v" style="left:-108px;top:-12px;color:#fff;font-size:21px;font-weight:600">Brainiac</div>
+        <div class="a v" style="left:-108px;top:14px;color:#8f8b84;font-size:17px;font-weight:450">Alejandro Magaña</div>
+        <div id="wave"></div>
+      </div>
+
+      <!-- player -->
+      <div id="Lplayer" class="layer">
+        <div class="a v" style="left:-224px;top:72px;color:#0e0e0e;font-size:28px;font-weight:600;letter-spacing:-.01em">Brainiac</div>
+        <div class="a v" style="left:-224px;top:104px;color:#8a867e;font-size:19px;font-weight:450">Alejandro Magaña</div>
+        <div id="tEl" class="a v mono" style="left:-224px;top:188px;color:#8a867e;font-size:15px">0:00</div>
+        <div id="tRem" class="a vr mono" style="left:224px;top:188px;color:#8a867e;font-size:15px">-0:00</div>
+        <svg class="ic" viewBox="0 0 24 24" style="left:-120px;top:246px;color:#0e0e0e"><path d="M19 20 9 12l10-8v16zM5 19V5"/></svg>
+        <svg class="ic" viewBox="0 0 24 24" style="left:120px;top:246px;color:#0e0e0e"><path d="M5 4l10 8-10 8V4zM19 5v14"/></svg>
+        <div id="playBtn" class="a" style="left:-36px;top:210px;width:72px;height:72px;border-radius:36px;background:#0e0e0e">
+          <svg class="a" style="left:36px;top:36px" width="1" height="1"><polygon id="pp1" fill="#fff"/><polygon id="pp2" fill="#fff"/></svg>
+        </div>
+      </div>
+
+      <!-- volume -->
+      <div id="Lvolume" class="layer">
+        <svg class="ic" viewBox="0 0 24 24" style="left:-236px;top:0px;color:#0e0e0e"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path id="w1" d="M15.5 8.5a5 5 0 0 1 0 7"/><path id="w2" d="M18.6 5.4a9.5 9.5 0 0 1 0 13.2"/></svg>
+      </div>
+
+      <!-- chart -->
+      <div id="Lchart" class="layer">
+        <div class="a" style="left:-296px;top:-242px;width:592px;height:72px;border-radius:36px;background:#f1efeb"></div>
+        <div class="a v" style="left:-272px;top:-134px;color:#8a867e;font-size:17px;font-weight:450">Total visits</div>
+        <div class="a v" style="left:-274px;top:-97px;color:#0e0e0e;font-size:40px;font-weight:600;letter-spacing:-.02em">48,210</div>
+        <div id="kBtn" class="a" style="left:192px;top:-140px;width:92px;height:44px;border-radius:22px;box-shadow:inset 0 0 0 1.5px #e3e0da">
+          <svg class="ic" viewBox="0 0 24 24" style="left:26px;top:22px;color:#0e0e0e"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <div class="a v" style="left:44px;top:22px;color:#0e0e0e;font-size:17px;font-weight:500">⌘K</div>
+        </div>
+        <svg id="plot" class="a" style="left:-320px;top:-270px" width="640" height="540" viewBox="-320 -270 640 540">
+          <defs><clipPath id="areaClip"><rect id="areaRect" x="-272" y="-80" width="0" height="260"/></clipPath></defs>
+          <g stroke="#ece9e4" stroke-width="1.5"><line x1="-272" x2="272" y1="-40" y2="-40"/><line x1="-272" x2="272" y1="55" y2="55"/><line x1="-272" x2="272" y1="150" y2="150"/></g>
+          <path id="area" fill="rgba(37,85,255,.07)" clip-path="url(#areaClip)"/>
+          <line id="guide" y1="-40" y2="150" stroke="#d6d2cb" stroke-width="1.5"/>
+          <path id="line" fill="none" stroke="#2555ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1 2"/>
+          <circle id="dot" r="7" fill="#fff" stroke="#2555ff" stroke-width="3.5"/>
+          <g id="months" fill="#8a867e" font-size="15" font-family="Geist" text-anchor="middle"></g>
+        </svg>
+        <div id="tip" class="a" style="height:44px;border-radius:12px;background:#0e0e0e;width:150px">
+          <div id="tipA" class="a vc" style="left:75px;top:22px;color:#fff;font-size:17px;font-weight:500"></div>
+          <div id="tipB" class="a vc" style="left:75px;top:22px;color:#fff;font-size:17px;font-weight:500"></div>
+        </div>
+      </div>
+
+      <!-- tab labels: ink set, knob, white set clipped to the knob -->
+      <div id="tabsInk" class="layer"></div>
+      <div id="knob" class="a"></div>
+      <div id="tabsWhiteClip" class="a" style="left:-1000px;top:-1000px;width:2000px;height:2000px"><div id="tabsWhite" class="layer" style="left:1000px;top:1000px"></div></div>
+
+      <!-- command palette (anchored to the shape's top edge) -->
+      <div id="Lcmdk" class="layer">
+        <svg class="ic" viewBox="0 0 24 24" style="left:-286px;top:40px;color:#0e0e0e"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <div id="qPh" class="a v" style="left:-256px;top:40px;color:#a19d95;font-size:22px">Search commands</div>
+        <div id="qText" class="a v" style="left:-256px;top:40px;color:#0e0e0e;font-size:22px;font-weight:450"></div>
+        <div id="caret" class="a" style="top:26px;width:2px;height:28px;background:#2555ff;border-radius:1px"></div>
+        <div class="a vr mono" style="left:290px;top:40px;color:#8a867e;font-size:14px;padding:5px 8px;border-radius:7px;box-shadow:inset 0 0 0 1.5px #e3e0da;transform:translate(-100%,-50%)">esc</div>
+        <div class="a" style="left:-320px;top:76px;width:640px;height:1.5px;background:#ece9e4"></div>
+        <div id="hl" class="a" style="left:-308px;width:616px;height:56px;border-radius:14px;background:#f1efea">
+          <div id="enterKey" class="a vr mono" style="left:600px;top:28px;color:#6f6b64;font-size:15px;padding:5px 9px;border-radius:7px;background:#fff;box-shadow:inset 0 0 0 1.5px #e3e0da">↵</div>
+        </div>
+        <div id="rows"></div>
+      </div>
+
+      <!-- toast -->
+      <div id="Ltoast" class="layer">
+        <div class="a" style="left:-186px;top:-16px;width:32px;height:32px;border-radius:16px;background:#2555ff">
+          <svg class="ic" viewBox="0 0 24 24" style="left:16px;top:16px;color:#fff;transform:scale(.75)"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+        </div>
+        <div class="a v" style="left:-140px;top:0;color:#fff;font-size:21px;font-weight:500">Notifications on</div>
+        <div class="a vr" style="left:180px;top:0;color:#8f8b84;font-size:19px;font-weight:500">Undo</div>
+      </div>
+    </div></div>
+  </div>
+  <svg id="cursor" viewBox="-2 -2 26 38"><path d="M0 0V29.5L7.2 22.6L12 33.4L16.6 31.4L11.9 20.8H21.8Z" fill="#0e0e0e" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>
+</div>
+
+<script src="engine.js"></script>
+<script>
+const M = Motion({ bpm: 120, bars: 7 });
+const { L, mod, clamp, lerp, easeOut, P, S, ptrack, blend, prepareEdges, edgePreset, box, vis, camera, set, px, rgb, rect, layer } = M;
+
+// ─── palette ───────────────────────────────────────────────────────
+const INK = [14, 14, 14], WHITE = [255, 255, 255], BLUE = [37, 85, 255], OFF = [207, 203, 196], HOVER = [38, 38, 38];
+
+// ─── the shape ─────────────────────────────────────────────────────
+const SIZES = [ // t, w, h, r, preset
+  [0.5, 316, 100, 50, 'snap'], [1.0, 96, 96, 48], [2.0, 104, 104, 52, 'snap'], [2.5, 440, 104, 52],
+  [4.0, 520, 600, 44], [6.0, 560, 104, 52], [8.0, 208, 116, 58], [9.0, 540, 104, 52],
+  [10.0, 640, 540, 40], [12.0, 640, 396, 30], [12.5, 640, 216, 30, 'snap'], [12.625, 640, 156, 30, 'snap'],
+  [13.0, 420, 96, 48], [13.5, 300, 96, 48],
+];
+const shapeWHR = ptrack(SIZES.map(e => [e[0], [e[1], e[2], e[3]], e[4] || 'morph']));
+const shapeCol = ptrack([[0.5, HOVER, 'snap'], [1.0, INK], [4.0, WHITE], [8.0, OFF], [8.5, BLUE, 'snap'], [9.0, WHITE, 'snap'], [13.0, INK]]);
+const shapePress = ptrack([[0.88, .965, 'snap'], [1.0, 1, 'snap'], [3.42, .97, 'snap'], [3.5, 1, 'snap']]);
+
+const fit = (w, h) => Math.min(4.2, 1120 / Math.max(w, h * 1.08));
+const camS = ptrack(SIZES.filter(e => ![0.5, 2.0, 12.5, 12.625].includes(e[0])).map(e => [e[0], fit(e[1], e[2]), 'cam']));
+
+// ─── cursor ────────────────────────────────────────────────────────
+const cursorXY = ptrack([
+  [13.55, [40, 18], 'glide'],   // glides into the button; still moving at t=0
+  [1.1, [72, 40], 'cur'],
+  [3.05, [120, 14], 'cur'],     // island
+  [4.05, [14, 248], 'cur'],     // play/pause
+  [4.6, [-78, 163], 'cur'],     // progress knob
+  [5.05, [96, 163], 'drag'],    // scrub
+  [6.08, [44, 3], 'cur'],       // volume knob
+  [6.55, [340, 5], 'pull'],     // drag past max
+  [7.56, [150, 50], 'cur'],
+  [8.02, [50, 10], 'cur'],      // toggle
+  [9.05, [4, 10], 'cur'],       // Week
+  [9.58, [170, 10], 'cur'],     // Month
+  [10.52, [-5, 52], 'cur'],     // hover Jul
+  [11.3, [177, -16], 'cur'],    // hover Oct (peak)
+  [11.62, [236, -114], 'cur'],  // ⌘K button
+  [12.1, [350, 120], 'cur'],
+  [12.9, [206, 84], 'cur'],
+]);
+const cursorPress = ptrack([
+  [0.88, .86, 'snap'], [1.0, 1, 'snap'], [3.42, .86, 'snap'], [3.5, 1, 'snap'], [4.42, .86, 'snap'], [4.5, 1, 'snap'],
+  [5.0, .86, 'snap'], [5.85, 1, 'snap'], [6.5, .86, 'snap'], [7.5, 1, 'snap'], [8.42, .86, 'snap'], [8.5, 1, 'snap'],
+  [9.42, .86, 'snap'], [9.5, 1, 'snap'], [9.92, .86, 'snap'], [10.0, 1, 'snap'], [11.92, .86, 'snap'], [12.0, 1, 'snap'],
+]);
+const cx = t => cursorXY(t)[0];
+
+// ─── player: scrub is direct manipulation ─────────────────────────
+const RP = { x1: -224, x2: 224, y: 160 }, RPW = RP.x2 - RP.x1;
+const P0 = .32, GRAB_P = 5.0, REL_P = 5.85;
+const offP = cx(GRAB_P) - (RP.x1 + P0 * RPW);
+const progress = t => t < GRAB_P ? P0 : clamp((cx(Math.min(t, REL_P)) - offP - RP.x1) / RPW, 0, 1);
+
+// ─── volume: direct drag, rubber-bands past max, springs back on release ─
+const RV = { x1: -196, x2: 236 }, RVW = RV.x2 - RV.x1;
+const V0 = .55, GRAB_V = 6.5, REL_V = 7.5;
+const offV = cx(GRAB_V) - (RV.x1 + V0 * RVW);
+const handX = t => cx(Math.min(t, REL_V)) - offV;
+const volume = t => t < GRAB_V ? V0 : clamp((handX(t) - RV.x1) / RVW, 0, 1);
+const rubber = o => 120 * (1 - Math.exp(-o / 120));
+const stretch = t => {
+  if (t < GRAB_V) return 0;
+  if (t < REL_V) return rubber(Math.max(0, handX(t) - RV.x2));
+  return rubber(Math.max(0, handX(REL_V) - RV.x2)) * (1 - S(t - REL_V, P.morph));
+};
+
+// ─── knob: progress knob → volume knob → toggle knob → liquid tab indicator ─
+const pKnob = d => t => box(RP.x1 + progress(t) * RPW, RP.y, d, d);
+const vKnob = d => t => box(RV.x1 + volume(t) * RVW + stretch(t), 0, d, d);
+const TAB = [-168, 0, 168], CTAB = [-193, 0, 193];
+const KNOB = [
+  { T: -1, f: pKnob(18), p: 'snap' },
+  { T: 5.0, f: pKnob(26), p: 'snap' },
+  { T: 5.85, f: pKnob(18), p: 'snap' },
+  { T: 6.0, f: vKnob(32), p: 'morph' },
+  { T: 6.5, f: vKnob(38), p: 'snap' },
+  { T: 7.5, f: vKnob(32), p: 'snap' },
+  { T: 8.0, f: () => box(-46, 0, 92, 92), p: 'morph' },
+  { T: 8.42, f: () => box(-38, 0, 108, 92), p: 'snap' },
+  { T: 8.5, f: () => box(46, 0, 92, 92), p: 'edge' },
+  { T: 9.0, f: () => box(TAB[0], 0, 156, 80), p: 'edge' },
+  { T: 9.5, f: () => box(TAB[1], 0, 156, 80), p: 'edge' },
+  { T: 10.0, f: () => box(CTAB[2], -206, 181, 60), p: 'edge' },
+];
+prepareEdges(KNOB);   // leading edge on a stiff spring, trailing edge looser → the indicator stretches
+const knobPreset = edgePreset;
+const knobCol = ptrack([[4.0, INK], [6.0, WHITE], [9.0, INK, 'snap']]);
+const knobShadow = ptrack([[6.0, 1], [9.0, 0]]);
+
+const RAIL = [
+  { T: -1, f: () => ({ x1: RP.x1, x2: RP.x2, y: RP.y, h: 6 }), p: 'morph' },
+  { T: 6.0, f: t => ({ x1: RV.x1, x2: RV.x2 + stretch(t), y: 0, h: 8 }), p: 'morph' },
+  { T: 8.0, f: () => ({ x1: -46, x2: -46, y: 0, h: 8 }), p: 'morph' },
+];
+const ART = [
+  { T: -1, f: () => ({ x1: -188, x2: -124, y1: -32, y2: 32, r: 14 }), p: 'morph' },
+  { T: 4.0, f: () => ({ x1: -224, x2: 224, y1: -264, y2: 36, r: 24 }), p: 'morph' },
+  { T: 6.0, f: () => ({ x1: -248, x2: -224, y1: -12, y2: 12, r: 6 }), p: 'morph' },
+];
+const TABPOS = [
+  { T: -1, f: () => ({ a: TAB[0], b: TAB[1], c: TAB[2], y: 0 }), p: 'morph' },
+  { T: 10.0, f: () => ({ a: CTAB[0], b: CTAB[1], c: CTAB[2], y: -206 }), p: 'morph' },
+];
+
+// ─── chart ─────────────────────────────────────────────────────────
+const VALS = [.28, .40, .34, .52, .46, .60, .54, .70, .64, .90, .76, .82];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const PTS = VALS.map((v, i) => [-272 + i * 544 / 11, 150 - v * 190]);
+const tipXY = ptrack([[10.0, PTS[6], 'snap'], [11.5, PTS[9], 'tip']]);
+const tipLabel = i => `${MONTHS[i]} · ${Math.round(VALS[i] * 5800).toLocaleString('en-US')}`;
+
+// ─── command palette ───────────────────────────────────────────────
+const ROWS = [
+  ['New project', '<path d="M12 5v14M5 12h14"/>'],
+  ['Export chart', '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>'],
+  ['Switch theme', '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'],
+  ['Toggle notifications', '<path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 8 2.5 8h-17S6 15 6 9zM10.2 20.5a2 2 0 0 0 3.6 0"/>'],
+  ['Open settings', '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>'],
+];
+const TYPED = [[12.5, 't'], [12.625, 'to'], [12.75, 'tog']];
+const query = t => { let q = ''; for (const [tt, s] of TYPED) if (t >= tt) q = s; return t >= 13.2 ? '' : q; };
+const matches = (label, q) => !q || label.toLowerCase().split(' ').some(w => w.startsWith(q));
+const SLOTS = [[-1, ''], [12.5, 't'], [12.625, 'to']].map(([T, q]) => {
+  const vis = ROWS.map(r => matches(r[0], q)); let n = 0;
+  return { T, vis, slot: vis.map(v => v ? n++ : 99) };
+});
+
+// ─── build the DOM ─────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const E = {};
+['world', 'shape', 'art', 'rail', 'fill', 'knob', 'Lbutton', 'btnLabel', 'btnArrow', 'Lloader', 'arc', 'checkPath', 'Lisland', 'wave',
+ 'Lplayer', 'tEl', 'tRem', 'playBtn', 'pp1', 'pp2', 'Lvolume', 'w1', 'w2', 'Lchart', 'kBtn', 'areaRect', 'area', 'guide', 'line', 'dot',
+ 'months', 'tip', 'tipA', 'tipB', 'tabsInk', 'tabsWhite', 'tabsWhiteClip', 'Lcmdk', 'qPh', 'qText', 'caret', 'hl', 'enterKey', 'rows',
+ 'Ltoast', 'cursor', 'rings'].forEach(id => E[id] = $(id));
+
+E.rings.innerHTML = [8, 16, 24, 32, 40, 48, 56, 64].map((r, i) => `<circle cx="${50 + i * 1.6}" cy="${52 - i * .8}" r="${r}" stroke-width="${1.6 - i * .1}" opacity="${.95 - i * .08}"/>`).join('');
+E.wave.innerHTML = [0, 1, 2, 3, 4].map(i => `<div class="a" id="wb${i}" style="left:${152 + i * 9}px;width:5px;border-radius:3px;background:#fff"></div>`).join('');
+const WB = [0, 1, 2, 3, 4].map(i => $('wb' + i));
+
+// smooth line through the points (Catmull-Rom → cubic Bézier)
+const pathD = (() => {
+  let d = `M${PTS[0][0]},${PTS[0][1]}`;
+  for (let i = 0; i < PTS.length - 1; i++) {
+    const p0 = PTS[Math.max(0, i - 1)], p1 = PTS[i], p2 = PTS[i + 1], p3 = PTS[Math.min(PTS.length - 1, i + 2)];
+    d += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`;
+  }
+  return d;
+})();
+E.line.setAttribute('d', pathD);
+E.area.setAttribute('d', `${pathD} L272,150 L-272,150 Z`);
+E.months.innerHTML = MONTHS.map((m, i) => i % 2 ? '' : `<text x="${PTS[i][0]}" y="190">${m}</text>`).join('');
+
+const tabHTML = color => ['Day', 'Week', 'Month'].map((s, i) => `<div class="a vc" id="tab${color}${i}" style="color:${color === 'W' ? '#fff' : '#0e0e0e'};font-size:20px;font-weight:500">${s}</div>`).join('');
+E.tabsInk.innerHTML = tabHTML('K');
+E.tabsWhite.innerHTML = tabHTML('W');
+const TABK = [0, 1, 2].map(i => $('tabK' + i)), TABW = [0, 1, 2].map(i => $('tabW' + i));
+
+E.rows.innerHTML = ROWS.map((r, i) => `<div class="a" id="row${i}" style="left:-308px;width:616px;height:56px">
+  <svg class="ic" viewBox="0 0 24 24" style="left:30px;top:28px;color:#0e0e0e">${r[1]}</svg>
+  <div class="a v" style="left:60px;top:28px;color:#0e0e0e;font-size:19px;font-weight:500">${r[0]}</div></div>`).join('');
+const ROWEL = ROWS.map((_, i) => $('row' + i));
+
+// pause (two bars) ↔ play (triangle split into two quads) share vertex order
+const PAUSE = [[[-8, -9], [-2.5, -9], [-2.5, 9], [-8, 9]], [[2.5, -9], [8, -9], [8, 9], [2.5, 9]]];
+const PLAY = [[[-6, -10], [2.5, -5.2], [2.5, 5.2], [-6, 10]], [[2.5, -5.2], [11.5, 0], [11.5, 0], [2.5, 5.2]]];
+const playMorph = ptrack([[4.5, 1, 'snap'], [3.0, 0, 'snap']]);
+const playPress = ptrack([[4.42, .9, 'snap'], [4.5, 1, 'snap']]);
+const kPress = ptrack([[11.92, .93, 'snap'], [12.0, 1, 'snap']]);
+const btnHover = ptrack([[0.5, 1, 'snap'], [6.0, 0, 'snap']]);
+const checkDraw = ptrack([[2.0, 1, 'draw'], [7.0, 0, 'snap']]);
+const lineDraw = ptrack([[10.5, 1, 'draw'], [13.0, 0, 'snap']]);
+const hlPress = ptrack([[12.96, 1, 'snap'], [13.06, 0, 'snap']]);
+
+let caretW = {};
+function measure() {
+  const s = document.createElement('span');
+  s.style.cssText = 'position:absolute;visibility:hidden;font:450 22px Geist;white-space:pre';
+  document.body.appendChild(s);
+  for (const q of ['', 't', 'to', 'tog']) { s.textContent = q; caretW[q] = s.getBoundingClientRect().width; }
+  s.remove();
+}
+
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// ─── seek: every style is a function of t, nothing carried between frames ─
+function seek(t) {
+  const cam0 = camS(t);
+
+  // shape
+  const [w0, h0, r0] = shapeWHR(t);
+  const ext = stretch(t);
+  const w = w0 + ext, h = h0 - ext * .1, r = Math.min(r0, w / 2, h / 2);
+  const sx = ext / 2;
+  // soft-min: the camera may lag the morph, but the shape never outgrows the frame
+  const cam = camera(cam0, w, h);
+  set(E.world, 'transform', `translate(720px,720px) scale(${cam.toFixed(5)})`);
+  set(E.shape, 'left', px(sx - w / 2)); set(E.shape, 'top', px(-h / 2));
+  set(E.shape, 'width', px(w)); set(E.shape, 'height', px(h));
+  set(E.shape, 'borderRadius', px(r));
+  set(E.shape, 'background', rgb(shapeCol(t)));
+  set(E.shape, 'transform', `scale(${shapePress(t).toFixed(4)})`);
+  const shadowA = .06 + .04 * clamp((w * h) / 200000, 0, 1);
+  set(E.shape, 'boxShadow', `0 ${px(1 / cam * 2)} ${px(3 / cam * 2)} rgba(0,0,0,.05), 0 ${px(14)} ${px(40)} rgba(0,0,0,${shadowA.toFixed(3)})`);
+  set(E.shape.firstElementChild, 'transform', `translateX(${px(-sx)})`);
+
+  // button
+  layer(E.Lbutton, vis(t, 13.5, 15.0), cam);
+  const hv = btnHover(t);
+  set(E.btnLabel, 'left', px(-16 * hv));
+  set(E.btnArrow, 'left', px(lerp(56, 76, hv)));
+  set(E.btnArrow, 'top', '0px');
+  set(E.btnArrow, 'opacity', clamp(hv, 0, 1).toFixed(3));
+
+  // loader → check
+  layer(E.Lloader, vis(t, 1.0, 2.5), cam);
+  const lp = easeOut(clamp((t - 1.0) / 1.0, 0, 1) * 1.02);
+  const len = lerp(14, 100, lp);
+  set(E.arc, 'strokeDasharray', `${len.toFixed(2)} ${(100 - len + .001).toFixed(2)}`);
+  set(E.arc, 'transform', `rotate(${(-90 + (t - 1.0) * 420 * (1 - lp * .6)).toFixed(2)}deg)`);
+  const cd = checkDraw(t);
+  set(E.checkPath, 'strokeDasharray', '1 2');
+  set(E.checkPath, 'strokeDashoffset', (1 - clamp(cd, 0, 1)).toFixed(4));
+  set(E.checkPath, 'opacity', cd > .005 ? '1' : '0');
+
+  // island
+  layer(E.Lisland, vis(t, 2.5, 4.0), cam);
+  const beat = Math.floor(t * 2) / 2, since = t - beat;
+  WB.forEach((el, i) => {
+    const amp = .45 + .55 * Math.abs(Math.sin(beat * 7.3 + i * 2.1));
+    const hh = 6 + 26 * amp * Math.exp(-since * 5.5) + 4 * Math.abs(Math.sin(t * 9 + i));
+    set(el, 'height', px(hh)); set(el, 'top', px(-hh / 2));
+  });
+
+  // art (island thumb → album art → gone)
+  const aA = vis(t, 2.5, 6.0, .02, .16);
+  const ar = blend(t, ART);
+  rect(E.art, ar.x1, ar.y1, ar.x2, ar.y2);
+  set(E.art, 'borderRadius', px(ar.r)); set(E.art, 'overflow', 'hidden');
+  set(E.art, 'opacity', aA.toFixed(3)); set(E.art, 'visibility', aA < .002 ? 'hidden' : 'visible');
+
+  // player
+  layer(E.Lplayer, vis(t, 4.0, 6.0), cam);
+  const p = progress(t);
+  E.tEl.textContent = fmt(p * 201);
+  E.tRem.textContent = '-' + fmt(201 - Math.floor(p * 201));
+  const m = clamp(playMorph(t), -.05, 1.05);
+  [E.pp1, E.pp2].forEach((el, k) => el.setAttribute('points', PAUSE[k].map((a, j) => `${lerp(a[0], PLAY[k][j][0], m).toFixed(2)},${lerp(a[1], PLAY[k][j][1], m).toFixed(2)}`).join(' ')));
+  set(E.playBtn, 'transform', `scale(${playPress(t).toFixed(4)})`);
+
+  // rail + fill
+  const rA = vis(t, 4.0, 8.0, .05, .18);
+  const rl = blend(t, RAIL);
+  const kn = blend(t, KNOB, knobPreset);
+  rect(E.rail, rl.x1, rl.y - rl.h / 2, rl.x2, rl.y + rl.h / 2);
+  set(E.rail, 'borderRadius', px(rl.h / 2)); set(E.rail, 'background', '#e6e3de');
+  const kcx = (kn.x1 + kn.x2) / 2;
+  rect(E.fill, rl.x1, rl.y - rl.h / 2, Math.max(rl.x1, Math.min(kcx, rl.x2)), rl.y + rl.h / 2);
+  set(E.fill, 'borderRadius', px(rl.h / 2)); set(E.fill, 'background', '#2555ff');
+  for (const el of [E.rail, E.fill]) { set(el, 'opacity', rA.toFixed(3)); set(el, 'visibility', rA < .002 ? 'hidden' : 'visible'); }
+
+  // volume
+  layer(E.Lvolume, vis(t, 6.0, 8.0), cam);
+  const v = volume(t);
+  set(E.w1, 'opacity', clamp(v * 4, 0, 1).toFixed(3));
+  set(E.w2, 'opacity', clamp((v - .6) * 3, 0, 1).toFixed(3));
+
+  // knob / indicator
+  const kA = vis(t, 4.0, 12.0, .05, .18);
+  rect(E.knob, kn.x1, kn.y1, kn.x2, kn.y2);
+  set(E.knob, 'borderRadius', px(Math.min(kn.x2 - kn.x1, kn.y2 - kn.y1) / 2));
+  set(E.knob, 'background', rgb(knobCol(t)));
+  const ks = clamp(knobShadow(t), 0, 1);
+  set(E.knob, 'boxShadow', `0 0 0 ${px(1.5 * ks)} rgba(0,0,0,${(.06 * ks).toFixed(3)}), 0 ${px(3 * ks)} ${px(10 * ks)} rgba(0,0,0,${(.16 * ks).toFixed(3)})`);
+  set(E.knob, 'opacity', kA.toFixed(3)); set(E.knob, 'visibility', kA < .002 ? 'hidden' : 'visible');
+
+  // tab labels (white copy clipped to the indicator)
+  const tA = vis(t, 9.0, 12.0);
+  layer(E.tabsInk, tA, cam); layer(E.tabsWhite, tA, cam);
+  const tp = blend(t, TABPOS);
+  [tp.a, tp.b, tp.c].forEach((x, i) => { for (const el of [TABK[i], TABW[i]]) { set(el, 'left', px(x)); set(el, 'top', px(tp.y)); } });
+  const kr = Math.min(kn.x2 - kn.x1, kn.y2 - kn.y1) / 2;
+  set(E.tabsWhiteClip, 'clipPath', `inset(${px(kn.y1 + 1000)} ${px(1000 - kn.x2)} ${px(1000 - kn.y2)} ${px(kn.x1 + 1000)} round ${px(kr)})`);
+
+  // chart
+  layer(E.Lchart, vis(t, 10.0, 12.0, .12), cam);
+  const ld = clamp(lineDraw(t), 0, 1);
+  set(E.line, 'strokeDashoffset', (1 - ld).toFixed(4));
+  set(E.line, 'opacity', ld > .003 ? '1' : '0');
+  E.areaRect.setAttribute('width', (544 * ld).toFixed(2));
+  const tipA = vis(t, 11.0, 11.72, -.02, .14);
+  const [tx, ty] = tipXY(t);
+  for (const el of [E.guide]) { el.setAttribute('x1', tx.toFixed(2)); el.setAttribute('x2', tx.toFixed(2)); el.setAttribute('opacity', tipA.toFixed(3)); }
+  E.dot.setAttribute('cx', tx.toFixed(2)); E.dot.setAttribute('cy', ty.toFixed(2)); E.dot.setAttribute('opacity', tipA.toFixed(3));
+  set(E.tip, 'left', px(tx - 75)); set(E.tip, 'top', px(ty - 70));
+  set(E.tip, 'opacity', tipA.toFixed(3));
+  set(E.tip, 'transform', `translateY(${px((1 - tipA) * 6)}) scale(${(.96 + .04 * tipA).toFixed(4)})`);
+  E.tipA.textContent = tipLabel(6); E.tipB.textContent = tipLabel(9);
+  const sw = 1 - easeOut((t - 11.5) / .1), swIn = easeOut((t - 11.56) / .16);
+  set(E.tipA, 'opacity', sw.toFixed(3)); set(E.tipA, 'filter', sw < .98 ? `blur(${((1 - sw) * 4).toFixed(2)}px)` : 'none');
+  set(E.tipB, 'opacity', swIn.toFixed(3)); set(E.tipB, 'filter', swIn < .98 ? `blur(${((1 - swIn) * 4).toFixed(2)}px)` : 'none');
+  set(E.kBtn, 'transform', `scale(${kPress(t).toFixed(4)})`);
+
+  // command palette, pinned to the shape's top edge
+  layer(E.Lcmdk, vis(t, 12.0, 13.0), cam);
+  set(E.Lcmdk, 'top', px(-h / 2));
+  const q = query(t);
+  E.qText.textContent = q;
+  set(E.qPh, 'opacity', q ? '0' : '1');
+  const typedAt = TYPED.filter(e => t >= e[0]).map(e => e[0]).pop() ?? 12.0;
+  const blink = (t - typedAt) < .25 || Math.floor((t - typedAt) * 4) % 2 === 0;
+  set(E.caret, 'left', px(-256 + caretW[q] + 2)); set(E.caret, 'opacity', blink ? '1' : '0');
+  const slotSegs = SLOTS.map(s => ({ T: s.T, f: () => Object.fromEntries(ROWS.map((_, i) => [i, Math.min(s.slot[i], 5)])), p: 'snap' }));
+  const slots = blend(t, slotSegs);
+  const cur = SLOTS.filter(s => t >= s.T).pop();
+  ROWEL.forEach((el, i) => {
+    set(el, 'top', px(84 + slots[i] * 60));
+    const on = cur.vis[i];
+    const changed = SLOTS.filter(s => s.T <= t && s.T > 0).map(s => s.T).pop() ?? -1;
+    const a = on ? 1 : 1 - easeOut((t - changed) / .1);
+    set(el, 'opacity', a.toFixed(3));
+    set(el, 'filter', a < .98 ? `blur(${((1 - a) * 5).toFixed(2)}px)` : 'none');
+  });
+  set(E.hl, 'top', '84px');
+  const hp = clamp(hlPress(t), 0, 1);
+  set(E.hl, 'background', rgb([lerp(241, 226, hp), lerp(239, 223, hp), lerp(234, 216, hp)]));
+  set(E.enterKey, 'transform', `translate(-100%,-50%) scale(${(1 - .08 * hp).toFixed(4)})`);
+
+  // toast
+  layer(E.Ltoast, vis(t, 13.0, 13.5), cam);
+
+  // cursor lives in screen space: constant size, world position through the camera
+  const [wx, wy] = cursorXY(t);
+  const scx = 720 + cam * wx, scy = 720 + cam * wy;
+  set(E.cursor, 'transform', `translate(${px(scx - 2)},${px(scy - 2)}) scale(${(1.45 * cursorPress(t)).toFixed(4)})`);
+}
+
+const CUES = [ // [time, sound, gain] — tools/mix.py places each sound's measured peak on its time
+  [0.5, 'soft', .5], [1.0, 'click', 1], [2.0, 'check', 1], [3.5, 'click', 1], [4.5, 'click', 1], [5.0, 'grab', 1], [5.85, 'release', 1],
+  [6.5, 'grab', 1], [7.5, 'release', 1], [8.5, 'switch', 1], [9.5, 'click', 1], [10.0, 'click', 1], [11.0, 'soft', .6], [11.5, 'soft', .6],
+  [12.0, 'click', 1], [12.5, 'key', 1], [12.625, 'key', .9], [12.75, 'key', .95], [13.0, 'enter', 1], [13.0, 'pop', 1],
+];
+mount({ M, seek, cues: CUES, init: measure });
+</script>
+</body>
+</html>

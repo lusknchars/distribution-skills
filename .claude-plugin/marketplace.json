@@ -1,0 +1,14 @@
+{
+  "name": "distribution-skills",
+  "owner": { "name": "Lucas Oliveira" },
+  "metadata": {
+    "description": "Skills for distribution: turning a product into the assets that sell it."
+  },
+  "plugins": [
+    {
+      "name": "motion-market",
+      "source": "./plugins/motion-market",
+      "description": "Dribbble-grade UI motion videos of your app: one shape morphing through real UI states, cut to music, rendered to a seamless MP4 loop."
+    }
+  ]
+}
