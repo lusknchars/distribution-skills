@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Brand ad</title>
+<style>
+  @font-face { font-family: 'Display'; src: url(fonts/BeVietnamPro-SemiBold.ttf); font-weight: 600; }
+  :root { --ink: #0E0E10; --accent: #CB2957; --bg: #EEEEEE; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; background: var(--bg); }
+  #stage { position: relative; overflow: hidden; background: var(--bg); font-family: Display, sans-serif; color: var(--ink); }
+  .L { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  .A { position: absolute; }
+  svg { position: absolute; left: 0; top: 0; overflow: visible; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="vendor/opentype.min.js"></script>
+<script src="vendor/flubber.min.js"></script>
+<script src="kit.js"></script>
+<script>
+// Starter: 12 beats at 140 BPM (~5.1 s). card → word → word → number → ink line → logo on the hit.
+// Replace the words, colours, light path and the logo with the brand's own. Every beat number below is a cue.
+const E = {}, R = {};
+const HIT = 10;                                   // the beat the logo lands on (the song's big hit)
+
+Ad({
+  bpm: 140, beats: 12,
+  cues: [[0, 'pop', -6], [1, 'whoosh-small', -8], [2, 'marker', -2], [4, 'whoosh-small', -10], [6, 'pop', -6], [7, 'pop', -6], [8.6, 'whoosh-big', -6], [HIT, 'verified', -3]],
+  async setup() {
+    const FONT = await loadFont('fonts/BeVietnamPro-ExtraBold.ttf');
+    E.dither = Dither({ palette: [[185, 45, 93], [255, 140, 130], [255, 226, 214]] });
+    E.hex = Honeycomb({
+      light: [[0, CX, CY], [2, CX, CY - 120], [4, CX, CY], [6, CX - 300, CY], [7, CX + 300, CY], [8.6, CX, CY]],
+      ripples: [[0, CX, CY, .8], [2, CX, CY - 120, .7], [4, CX, CY, .7], [6, CX - 300, CY, .6], [7, CX + 300, CY, .6], [HIT, CX, CY, 1.4]],
+    });
+    E.wordL = svgLayer(5); E.word = new Word(E.wordL);
+    E.paint = svgLayer(6); E.circle = paint(E.paint, '', 'var(--accent)', 12);
+    E.logoL = svgLayer(10); E.logo = new Word(E.logoL);
+    // rings: every shape the main element passes through
+    const size = Math.min(W, H) * .3, maxW = W * .78;
+    R.card = shape(rectRing(CX - 180, CY - 230, 360, 460));
+    R.a = fit(FONT, 'idea', maxW, size, CX, CY);
+    R.b = fit(FONT, 'test', maxW, size, CX, CY);
+    R.c = fit(FONT, '10/10', maxW, size, CX, CY);
+    R.line = shape(rectRing(CX - maxW * .4, CY - 7, maxW * .8, 14));
+    E.m = [new Morph(R.card, R.a), new Morph(R.a, R.b), new Morph(R.b, R.c), new Morph(R.c, R.line)];
+    // logo: rises out of the ink line, clipped at the line
+    R.logo = fit(FONT, 'Brand', maxW, size * 1.1, CX, CY - 40);
+    const cp = sv(E.logoL.svg.querySelector('defs'), 'clipPath', { id: 'logoclip', clipPathUnits: 'userSpaceOnUse' });
+    sv(cp, 'rect', { x: 0, y: 0, width: W, height: R.logo.bb.y2 + 10 });
+    sv(E.logoL.svg, 'g', { 'clip-path': 'url(#logoclip)' }).appendChild(E.logo.g);
+  },
+  frame(b, t) {
+    E.dither(t); E.hex(b);
+    // main element: one shape the whole time, each morph lands on a beat
+    const keys = [[1, 0], [4, 1], [6, 2], [8.6, 3]];
+    let i = -1; for (let k = 0; k < keys.length; k++) if (b >= keys[k][0]) i = k;
+    const pop = Math.max(0, track(b, 0, [[0, 1, 18, .62]]));
+    const d = i < 0 ? E.m[0].at(0) : E.m[keys[i][1]].at(ease(prog(b, keys[i][0], .7)));
+    const lineY = R.logo.bb.y2 + 3 - CY;                                   // the ink line moves to sit under the logo
+    const dy = track(b, 0, [[8.6, lineY, 14, .9]]);
+    E.word.set(d, `translate(0 ${dy.toFixed(1)}) ${around(CX, CY, pop)}`, b < HIT + .55);
+    E.word.color(i === 2 ? 'var(--accent)' : 'var(--ink)');
+    // the line pulls in after the logo lands
+    if (b >= HIT) { const k = ease(prog(b, HIT + .05, .5)); E.word.set(E.m[3].at(1), `translate(0 ${dy.toFixed(1)}) translate(${CX} 0) scale(${(1 - k).toFixed(4)} 1) translate(${-CX} 0)`, k < 1); }
+    // painted loop draws on around "idea", then draws back off
+    E.circle.setAttribute('d', loop(CX, CY, (R.a.bb.x2 - R.a.bb.x1) * .62, (R.a.bb.y2 - R.a.bb.y1) * .9, 2));
+    draw(E.circle, b < 3.7 ? easeOut(prog(b, 2, .6)) : 1 - easeOut(prog(b, 3.7, .3)));
+    // logo rises out of the line on the hit
+    const rise = 1 - track(b, 0, [[HIT, 1, 15, .82]]);
+    E.logo.set(still(R.logo), `translate(0 ${(rise * (R.logo.bb.y2 - R.logo.bb.y1 + 40)).toFixed(1)})`, b >= HIT);
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "brand-ad",
+  "version": "0.1.0",
+  "description": "Fast 10–15 s brand ads: glyph-outline morphing type, painted strokes on real images, the brand's own background, cut to a song edit that lands the logo on the hit.",
+  "author": { "name": "Lucas Oliveira" },
+  "license": "MIT",
+  "keywords": ["ad", "video", "motion", "typography", "morph", "playwright", "ffmpeg"]
+}

@@ -1,0 +1,611 @@
+<!doctype html>
+<!-- Reference only: the Paper Raft ad (15 s, 139.7 BPM grid as used). Assets (papers, fonts, data.json) are not included; it predates kit.js, so helpers are inlined. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Paper Raft ad</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@500;600&display=block" rel="stylesheet">
+<style>
+  @font-face { font-family: 'BVP'; src: url(assets/fonts/BeVietnamPro-ExtraBold.ttf); font-weight: 800; }
+  @font-face { font-family: 'BVP'; src: url(assets/fonts/BeVietnamPro-Bold.ttf); font-weight: 700; }
+  @font-face { font-family: 'BVP'; src: url(assets/fonts/BeVietnamPro-SemiBold.ttf); font-weight: 600; }
+  @font-face { font-family: 'BVP'; src: url(assets/fonts/BeVietnamPro-Medium.ttf); font-weight: 500; }
+  :root { --ink: #0E0E10; --red: #CB2957; --white: #FFFFFF; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1440px; height: 1440px; overflow: hidden; background: #eeeeee; }
+  #stage { position: relative; width: 1440px; height: 1440px; overflow: hidden; background: #eeeeee; font-family: BVP, sans-serif; color: var(--ink); }
+  .L { position: absolute; left: 0; top: 0; width: 1440px; height: 1440px; }
+  .A { position: absolute; }
+  .card { position: absolute; overflow: hidden; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.05), 0 18px 50px rgba(14,14,16,.14); }
+  .card img { position: absolute; }
+  svg { position: absolute; left: 0; top: 0; overflow: visible; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<script src="assets/vendor/opentype.min.js"></script>
+<script src="assets/vendor/flubber.min.js"></script>
+<script>
+// ─────────── time ───────────
+const BPM = 139.7, B = 60 / BPM, END = 35;
+window.DURATION = END * B;
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+const ease = k => { k = clamp(k); return k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; };          // in-out cubic
+const easeOut = k => 1 - Math.pow(1 - clamp(k), 3);
+const expoIn = k => { k = clamp(k); return k === 0 ? 0 : Math.pow(2, 10 * k - 10); };
+function spring(t, w = 16, z = 0.6) {
+  if (t <= 0) return 0;
+  if (z < 1) { const wd = w * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t)); }
+  return 1 - Math.exp(-w * t) * (1 + w * t);
+}
+// sum of one spring per change: a pure function of time
+function track(b, v0, keys, w = 16, z = 0.6) { let v = v0, p = v0; for (const k of keys) { v += (k[1] - p) * spring((b - k[0]) * B, k[2] ?? w, k[3] ?? z); p = k[1]; } return v; }
+const prog = (b, a, len) => clamp((b - a) / len);
+const win = (b, a, z) => b >= a && b < z;
+
+// ─────────── dom ───────────
+const stage = document.getElementById('stage');
+const NS = 'http://www.w3.org/2000/svg';
+function div(p, css = {}, html = '', cls = 'A') { const e = document.createElement('div'); e.className = cls; Object.assign(e.style, css); if (html) e.innerHTML = html; p.appendChild(e); return e; }
+function sv(p, tag, at = {}) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); p.appendChild(e); return e; }
+function S(e, css) { for (const k in css) e.style[k] = css[k]; }
+const show = (e, on) => { const v = on ? '' : 'none'; if (e.style.display !== v) e.style.display = v; };
+const px = v => v.toFixed(2) + 'px';
+const svgLayer = (z) => { const d = div(stage, { zIndex: z }, '', 'L'); const s = sv(d, 'svg', { width: 1440, height: 1440, viewBox: '0 0 1440 1440' }); d.svg = s; return d; };
+
+// ─────────── morphing type (glyph outlines → rings → flubber) ───────────
+let FONT, SERIF;
+function ringsOf(text, size, cx, cy, font = FONT, opt = {}) {
+  const p = font.getPath(text, 0, 0, size, opt), bb = p.getBoundingBox();
+  const dx = cx - (bb.x1 + bb.x2) / 2, dy = cy - (bb.y1 + bb.y2) / 2;
+  const rings = []; let d = '', pts = [];
+  const f = v => v.toFixed(2);
+  for (const c of p.commands) {
+    if (c.type === 'M') { if (d) rings.push({ d, pts }); d = `M${f(c.x + dx)} ${f(c.y + dy)}`; pts = [[c.x + dx, c.y + dy]]; }
+    else if (c.type === 'L') { d += `L${f(c.x + dx)} ${f(c.y + dy)}`; pts.push([c.x + dx, c.y + dy]); }
+    else if (c.type === 'Q') { d += `Q${f(c.x1 + dx)} ${f(c.y1 + dy)} ${f(c.x + dx)} ${f(c.y + dy)}`; pts.push([c.x + dx, c.y + dy]); }
+    else if (c.type === 'C') { d += `C${f(c.x1 + dx)} ${f(c.y1 + dy)} ${f(c.x2 + dx)} ${f(c.y2 + dy)} ${f(c.x + dx)} ${f(c.y + dy)}`; pts.push([c.x + dx, c.y + dy]); }
+    else if (c.type === 'Z') { d += 'Z'; rings.push({ d, pts }); d = ''; pts = []; }
+  }
+  if (d) rings.push({ d, pts });
+  for (const r of rings) { let a = 0, sx = 0, sy = 0; r.pts.forEach((p, i) => { const q = r.pts[(i + 1) % r.pts.length]; a += p[0] * q[1] - q[0] * p[1]; sx += p[0]; sy += p[1]; }); r.area = a / 2; r.cx = sx / r.pts.length; r.cy = sy / r.pts.length; }
+  const big = rings.reduce((m, r) => Math.abs(r.area) > Math.abs(m.area) ? r : m, rings[0]);
+  const sgn = Math.sign(big.area);
+  const outers = rings.filter(r => Math.sign(r.area) === sgn).sort((a, b) => a.cx - b.cx);
+  const holes = rings.filter(r => Math.sign(r.area) !== sgn).sort((a, b) => a.cx - b.cx);
+  return { outers, holes, all: rings.map(r => r.d).join(''), bb: { x1: bb.x1 + dx, y1: bb.y1 + dy, x2: bb.x2 + dx, y2: bb.y2 + dy } };
+}
+function fit(text, maxW, size, cx, cy) { const p = FONT.getPath(text, 0, 0, size).getBoundingBox(); const w = p.x2 - p.x1; return ringsOf(text, w > maxW ? size * maxW / w : size, cx, cy); }
+const dot = (x, y, r = 0.6) => ({ d: `M${x - r} ${y}L${x + r} ${y - r}L${x + r} ${y + r}Z`, cx: x, cy: y });
+const rectRing = (x, y, w, h) => ({ d: `M${x} ${y}L${x + w} ${y}L${x + w} ${y + h}L${x} ${y + h}Z`, cx: x + w / 2, cy: y + h / 2 });
+// pair two ring lists: the shorter list is spread across the longer (shapes split / merge); empty side grows from a point
+function pairUp(A, Bs) {
+  const out = [];
+  if (!A.length && !Bs.length) return out;
+  if (!A.length) return Bs.map(b => [dot(b.cx, b.cy), b]);
+  if (!Bs.length) return A.map(a => [a, dot(a.cx, a.cy)]);
+  const n = Math.max(A.length, Bs.length);
+  for (let k = 0; k < n; k++) {
+    const a = A[A.length === n ? k : Math.round(k * (A.length - 1) / Math.max(1, n - 1))];
+    const b = Bs[Bs.length === n ? k : Math.round(k * (Bs.length - 1) / Math.max(1, n - 1))];
+    out.push([a, b]);
+  }
+  return out;
+}
+class Morph {
+  // A, B: { outers, holes }  →  interpolators; draws into an outer path and a hole path (filled with the background)
+  constructor(A, B) {
+    const o = { maxSegmentLength: 6 };
+    this.o = pairUp(A.outers, B.outers).map(([a, b]) => flubber.interpolate(a.d, b.d, o));
+    this.h = pairUp(A.holes, B.holes).map(([a, b]) => flubber.interpolate(a.d, b.d, o));
+    this.A = A; this.B = B;
+  }
+  at(t) {
+    if (t <= 0) return [this.A.outers.map(r => r.d).join(''), this.A.holes.map(r => r.d).join('')];
+    if (t >= 1) return [this.B.outers.map(r => r.d).join(''), this.B.holes.map(r => r.d).join('')];
+    return [this.o.map(f => f(t)).join(''), this.h.map(f => f(t)).join('')];
+  }
+}
+let wid = 0;
+class Word {
+  // outlines in a mask (union of outers minus counters), so counters show whatever is behind
+  constructor(layer, color = 'var(--ink)') {
+    const id = 'wm' + (wid++); const defs = layer.svg.querySelector('defs') || sv(layer.svg, 'defs');
+    const m = sv(defs, 'mask', { id, maskUnits: 'userSpaceOnUse', x: -40000, y: -40000, width: 80000, height: 80000 });
+    this.mo = sv(m, 'path', { fill: '#fff' }); this.mh = sv(m, 'path', { fill: '#000' });
+    this.g = sv(layer.svg, 'g'); this.o = sv(this.g, 'rect', { x: -40000, y: -40000, width: 80000, height: 80000, fill: color, mask: `url(#${id})` });
+  }
+  set([o, h], transform = '', on = true) { show(this.g, on); if (!on) return; this.mo.setAttribute('d', o); this.mh.setAttribute('d', h); this.g.setAttribute('transform', transform); }
+  color(c) { this.o.setAttribute('fill', c); }
+}
+const around = (cx, cy, s) => `translate(${cx} ${cy}) scale(${s.toFixed(4)}) translate(${-cx} ${-cy})`;
+
+// ─────────── painted strokes ───────────
+function paint(layer, d, color, width, extra = {}) {
+  return sv(layer.svg, 'path', { d, fill: 'none', stroke: color, 'stroke-width': width, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1, ...extra });
+}
+const draw = (p, k) => { p.setAttribute('stroke-dashoffset', (1 - clamp(k)).toFixed(4)); show(p, k > 0.001); };
+function loop(cx, cy, rx, ry, seed = 1) {  // hand-drawn ellipse that overshoots its start
+  let d = ''; const n = 64;
+  for (let i = 0; i <= n; i++) {
+    const t = -0.35 + (2 * Math.PI + 0.75) * i / n, wob = 1 + 0.035 * Math.sin(t * 3 + seed) + 0.02 * Math.sin(t * 7 + seed * 2);
+    const x = cx + rx * wob * Math.cos(t) * (1 + 0.06 * i / n), y = cy + ry * wob * Math.sin(t) * (1 + 0.04 * i / n) - 6 * i / n;
+    d += (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }
+  return d;
+}
+const tick = (x, y, s) => `M${x} ${y + 0.5 * s}L${x + 0.36 * s} ${y + 0.86 * s}L${x + s} ${y}`;
+const cross = (x, y, s) => `M${x} ${y}L${x + s} ${y + s}M${x + s} ${y}L${x} ${y + s}`;
+
+// ─────────── assets ───────────
+const PAGES = ['2608.27428', '2607.25291', '2608.26004', '2609.03430', '2608.24070', '2608.21690', '2609.00749', '2608.31057', '2608.23552', '2609.01736', '2608.30701', '2609.06063'];
+const FIGS = ['2607.25291-p4-04', '2607.25291-p7-07', '2608.21690-p3-03', '2608.26004-p4-04', '2609.03430-p3-03', '2608.27428-p9-09', '2608.27428-p7-07'];
+const FIGSZ = {};
+const PAGE_W = 2125, PAGE_H = 2750;
+let DATA;
+
+// ─────────── raft mark ───────────
+// folded-paper raft: two sails (ink, red) on a hull
+const MARK = { sailL: [[50, 4], [24, 46], [50, 46]], sailR: [[50, 4], [76, 46], [50, 46]], hull: [[6, 50], [94, 50], [80, 76], [20, 76]] };
+const markPts = (pts, x, y, s) => pts.map(p => `${(x + (p[0] - 50) * s).toFixed(1)},${(y + (p[1] - 40) * s).toFixed(1)}`).join(' ');
+
+
+// ─────────── background ───────────
+const DW = 288;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5], PAL = [[185, 45, 93], [255, 140, 130], [255, 226, 214]];
+function drawDither(seconds) {   // ported from Paperraft's site background (src/radar/site_assets.py)
+  const W = DW, H = DW, px = E.dimg.data, aspect = 1, time = seconds * 2.3; let i = 0;
+  for (let y = 0; y < H; y++) { const ny = (y / H) * 2 - 1;
+    for (let x = 0; x < W; x++) { const nx = ((x / W) * 2 - 1) * aspect;
+      const radius = Math.sqrt((nx + .28) * (nx + .28) + (ny - .12) * (ny - .12));
+      const marble = nx * .72 + ny * .18 + .48 * Math.sin(ny * 1.65 + time * .11) + .22 * Math.sin((nx - ny) * 2.15 - time * .08);
+      const field = .5 + .95 * (Math.sin(marble * 6 + time * .34) * .34 + Math.sin((radius + marble * .22) * 7.8 - time * .19) * .16);
+      const th = ((BAYER[(y & 3) * 4 + (x & 3)] + .5) / 16 - .5) * .24, toned = Math.max(0, Math.min(.999, field + th));
+      const c = PAL[toned < .335 ? 0 : toned < .665 ? 1 : 2]; px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2]; px[i + 3] = 255; i += 4; } }
+  E.dctx.putImageData(E.dimg, 0, 0);
+}
+// honeycomb: flat-top hexes; edges light up near a moving light and in rings that ripple out from each hit
+const HR = 58;
+function buildHex() {
+  const seen = new Map(), dx = 1.5 * HR, dy = Math.sqrt(3) * HR;
+  for (let c = -1; c * dx < 1440 + HR * 2; c++) for (let r = -1; r * dy < 1440 + dy; r++) {
+    const cx = c * dx, cy = r * dy + (c & 1 ? dy / 2 : 0);
+    const V = [...Array(6)].map((_, k) => [cx + HR * Math.cos(k * Math.PI / 3), cy + HR * Math.sin(k * Math.PI / 3)]);
+    for (let k = 0; k < 6; k++) { const a = V[k], b2 = V[(k + 1) % 6], mx = (a[0] + b2[0]) / 2, my = (a[1] + b2[1]) / 2, key = Math.round(mx) + ',' + Math.round(my);
+      if (!seen.has(key)) seen.set(key, { a, b: b2, mx, my }); }
+  }
+  E.edges = [...seen.values()];
+}
+const LIGHT = [[0, 720, 720], [2.0, 720, 720], [5.9, 720, 470], [9.4, 720, 300], [10.0, 236, 430], [12.0, 236, 1030], [13.0, 720, 720], [17.2, 110, 720], [18.4, 1090, 720], [19.0, 720, 690],
+  [23.5, 720, 720], [24.25, 1140, 1030], [25.0, 720, 700], [25.8, 1080, 720], [26.5, 720, 720], [27.75, 1000, 980], [28.25, 720, 720], [31.0, 720, 700]];
+const RIPPLES = [[2.0, 720, 720, 1.2], [3.3, 720, 720, .8], [6.0, 720, 470, .9], [7.0, 1080, 1010, .6], [7.25, 300, 1060, .6], [7.5, 1170, 290, .6], [8.35, 720, 470, .8],
+  [10.05, 236, 470, .7], [10.55, 236, 620, .6], [11.05, 236, 770, .6], [11.55, 236, 920, .6], [12.05, 236, 1070, .6], [13.35, 720, 720, .7], [16.4, 720, 720, 1.0], [17.2, 110, 720, .7],
+  [19.0, 720, 690, .9], [20.0, 720, 690, .7], [21.0, 720, 690, .7], [22.0, 720, 690, .9], [23.5, 720, 720, .7], [24.5, 720, 760, .6], [25.5, 360, 720, .6], [26.5, 720, 720, .6], [27.5, 470, 560, .6],
+  [28.25, 720, 720, .7], [29.4, 720, 700, .6], [31.0, 720, 700, 1.4]];
+function lightAt(b) { let x = LIGHT[0][1], y = LIGHT[0][2], px0 = x, py0 = y;
+  for (const k of LIGHT.slice(1)) { const sp = spring((b - k[0]) * B, 9, .85); x += (k[1] - px0) * sp; y += (k[2] - py0) * sp; px0 = k[1]; py0 = k[2]; } return [x, y]; }
+function drawHex(b) {
+  const [lx, ly] = lightAt(b), act = RIPPLES.filter(r => b >= r[0] && (b - r[0]) * B < 1.6);
+  const levels = [...Array(12)].map(() => []);
+  for (const e of E.edges) {
+    const d = Math.hypot(e.mx - lx, e.my - ly); let v = 1.0 * Math.exp(-((d / 330) ** 2));
+    for (const r of act) { const tt = (b - r[0]) * B, rad = tt * 1300, w = 70 + tt * 60, dd = Math.hypot(e.mx - r[1], e.my - r[2]);
+      v += 1.25 * r[3] * Math.exp(-(((dd - rad) / w) ** 2)) * Math.exp(-tt * 2.0); }
+    v = Math.min(1, v); levels[Math.min(11, Math.floor(v * 12))].push(e);
+  }
+  const core = E.hexCore.getContext('2d'), glow = E.hexGlow.getContext('2d');
+  core.clearRect(0, 0, 1440, 1440); glow.clearRect(0, 0, 1440, 1440);
+  core.lineCap = 'round'; glow.lineCap = 'round';
+  // resting honeycomb, faint
+  core.beginPath(); for (const e of E.edges) { core.moveTo(e.a[0], e.a[1]); core.lineTo(e.b[0], e.b[1]); }
+  core.strokeStyle = 'rgba(150,40,80,.13)'; core.lineWidth = 1.5; core.stroke();
+  levels.forEach((L, k) => { if (!L.length || k === 0) return; const a = (k + .5) / 12;
+    core.beginPath(); glow.beginPath(); for (const e of L) { core.moveTo(e.a[0], e.a[1]); core.lineTo(e.b[0], e.b[1]); glow.moveTo(e.a[0], e.a[1]); glow.lineTo(e.b[0], e.b[1]); }
+    glow.strokeStyle = `rgba(185,45,93,${(a * .55).toFixed(3)})`; glow.lineWidth = 8 + a * 10; glow.stroke();
+    core.strokeStyle = `rgba(255,255,255,${Math.min(1, a * 1.1).toFixed(3)})`; core.lineWidth = 1.6 + a * 2.6; core.stroke(); });
+}
+
+// ═════════════════════ build ═════════════════════
+const E = {};
+function build() {
+
+  // ── background: the site's ordered-dither field (same palette/tuning), and the honeycomb glow
+  E.dither = document.createElement('canvas'); E.dither.width = DW; E.dither.height = DW;
+  S(E.dither, { position: 'absolute', left: 0, top: 0, width: '1440px', height: '1440px', imageRendering: 'pixelated', opacity: .3, mixBlendMode: 'multiply', zIndex: 0 });
+  stage.appendChild(E.dither); E.dctx = E.dither.getContext('2d'); E.dimg = E.dctx.createImageData(DW, DW);
+  E.hexGlow = document.createElement('canvas'); E.hexGlow.width = 1440; E.hexGlow.height = 1440; S(E.hexGlow, { position: 'absolute', left: 0, top: 0, zIndex: 1, filter: 'blur(7px)' }); stage.appendChild(E.hexGlow);
+  E.hexCore = document.createElement('canvas'); E.hexCore.width = 1440; E.hexCore.height = 1440; S(E.hexCore, { position: 'absolute', left: 0, top: 0, zIndex: 1 }); stage.appendChild(E.hexCore);
+  buildHex();
+  // A/B/C: page → grid → word
+  E.grid = div(stage, { zIndex: 2 }, '', 'L');
+  E.tiles = [];
+  for (let k = 0; k < 15; k++) {
+    const t = div(E.grid, {}, '', 'card'); const im = document.createElement('img');
+    const isFig = k >= 12; im.src = isFig ? `assets/figs/${FIGS[[0, 4, 3][k - 12]]}.png` : `assets/pages/${PAGES[k]}.png`; t.appendChild(im); t.img = im; t.fig = isFig ? FIGS[[0, 4, 3][k - 12]] : null; E.tiles.push(t);
+  }
+  E.paintA = svgLayer(3);
+  E.circleA = paint(E.paintA, '', 'var(--red)', 9);
+  E.inkTile = div(stage, { zIndex: 3, background: 'var(--ink)' });
+
+  // word layer (paper / test / numbers / verified) + page-4 seen through the counter
+  E.wordL = svgLayer(5);
+  const defs = sv(E.wordL.svg, 'defs');
+  const cp = sv(defs, 'clipPath', { id: 'hole', clipPathUnits: 'userSpaceOnUse' }); E.holeClip = sv(cp, 'path', {});
+  E.word = new Word(E.wordL);
+  E.p4in = sv(E.wordL.svg, 'image', { href: 'assets/pages/2608.27428-p4-04.png', width: PAGE_W, height: PAGE_H, 'clip-path': 'url(#hole)', preserveAspectRatio: 'none' });
+
+  // page 4 (claim) + figures + paint
+  E.p4L = div(stage, { zIndex: 4 }, '', 'L');
+  E.p4 = document.createElement('img'); E.p4.src = 'assets/pages/2608.27428-p4-04.png'; S(E.p4, { position: 'absolute', left: 0, top: 0, width: PAGE_W + 'px', transformOrigin: '0 0' }); E.p4L.appendChild(E.p4);
+  E.p4Paint = svgLayer(4);
+  E.hl = sv(E.p4Paint.svg, 'path', { fill: 'none', stroke: 'var(--red)', 'stroke-opacity': .32, 'stroke-linecap': 'round', pathLength: 1, 'stroke-dasharray': 1 });
+  E.arrow = paint(E.p4Paint, '', 'var(--red)', 9);
+  E.arrowHead = paint(E.p4Paint, '', 'var(--red)', 9);
+  E.figCards = [5, 1, 4].map(i => { const c = div(stage, { zIndex: 4 }, '', 'card'); const im = document.createElement('img'); im.src = `assets/figs/${FIGS[i]}.png`; c.appendChild(im); c.img = im; c.fig = FIGS[i]; return c; });
+  E.figCircle = paint(svgLayer(4), '', 'var(--red)', 8);
+
+  // highlight → "test" morph lives in its own layer above everything in this act
+  E.testL = svgLayer(6); E.test = new Word(E.testL, 'var(--red)');
+
+  // checklist
+  E.rowsL = div(stage, { zIndex: 6 }, '', 'L');
+  E.rowsPaint = svgLayer(7);
+  const rows = [['The paper’s own answer', 1], ['All zeros', 0], ['NaN', 0], ['Shuffled', 0], ['Scaled ×2', 0]];
+  E.rows = rows.map(([t, ok], i) => {
+    const y = 470 + i * 150;
+    const m = div(E.rowsL, { left: '330px', top: px(y - 60), width: '900px', height: '120px', overflow: 'hidden' });
+    const tx = div(m, { left: 0, top: 0, fontSize: '78px', fontWeight: 700, letterSpacing: '-2px', lineHeight: '120px', whiteSpace: 'nowrap', color: ok ? 'var(--ink)' : 'var(--ink)' }, t);
+    const mark = paint(E.rowsPaint, ok ? tick(190, y - 46, 92) : cross(196, y - 40, 80), ok ? 'var(--ink)' : 'var(--red)', 16);
+    const strike = paint(E.rowsPaint, `M330 ${y + 4}L${330 + 0} ${y + 4}`, 'var(--red)', 10);
+    return { m, tx, mark, strike, y, ok };
+  });
+
+  // terminal + 3D deck
+  E.deck = div(stage, { zIndex: 8, perspective: '2200px', perspectiveOrigin: '720px 720px' }, '', 'L');
+  E.deckIn = div(E.deck, { left: '0', top: '0', width: '1440px', height: '1440px', transformStyle: 'preserve-3d', transformOrigin: '720px 720px' });
+  E.sheets = PAGES.slice(0, 10).map((id, i) => { const c = div(E.deckIn, { left: '420px', top: '332px', width: '600px', height: '776px', background: '#fff', boxShadow: '0 30px 60px rgba(14,14,16,.18)', overflow: 'hidden', backfaceVisibility: 'hidden' });
+    const im = document.createElement('img'); im.src = `assets/pages/${id}.png`; S(im, { width: '600px', position: 'absolute', left: 0, top: 0 }); c.appendChild(im); c.shade = div(c, { inset: 0, background: '#000', opacity: 0 }); return c; });
+  E.blank = div(E.deckIn, { left: '420px', top: '332px', width: '600px', height: '776px', background: '#fff', boxShadow: '0 30px 60px rgba(14,14,16,.18)' });
+  E.term = div(E.deckIn, { left: '120px', top: '590px', width: '1200px', height: '260px', borderRadius: '40px', background: 'var(--ink)', overflow: 'hidden' });
+  E.termTx = div(E.term, { left: '64px', top: '0', lineHeight: '260px', fontFamily: '"Geist Mono", monospace', fontSize: '50px', fontWeight: 500, color: '#fff', whiteSpace: 'pre' });
+
+  // flow (light) + numbers
+  E.flowL = svgLayer(9); buildFlow(E.flowL.svg);
+  E.numL = svgLayer(10); E.num = new Word(E.numL);
+  E.numCap = div(stage, { zIndex: 10, left: 0, width: '1440px', top: '930px', height: '80px', overflow: 'hidden' });
+  E.caps = ['runs reproduce the paper', 'methods pass review', 'error against the exact answer'].map(t => div(E.numCap, { left: 0, right: 0, top: 0, textAlign: 'center', fontSize: '50px', fontWeight: 600, letterSpacing: '-1px', lineHeight: '80px' }, t));
+  E.numPlate = div(stage, { zIndex: 9, background: '#fff' });
+  E.verUnder = paint(svgLayer(11), '', 'var(--red)', 14);
+
+  // montage
+  E.mont = div(stage, { zIndex: 12 }, '', 'L');
+  E.montPaint = svgLayer(13);
+  E.shots = MONTAGE.map((m, i) => {
+    const c = div(E.mont, {}, '', 'card'); const im = document.createElement('img'); im.src = m.src; c.appendChild(im); c.img = im;
+    c.mark = m.mark ? paint(E.montPaint, '', m.mark === 'tick' ? 'var(--ink)' : 'var(--red)', m.mark === 'tick' ? 16 : 10) : null; return c;
+  });
+
+  // logo
+  E.logoL = svgLayer(20);
+  E.mk = { sailL: sv(E.logoL.svg, 'polygon', { fill: 'var(--ink)' }), sailR: sv(E.logoL.svg, 'polygon', { fill: 'var(--red)' }), hull: sv(E.logoL.svg, 'polygon', { fill: 'var(--ink)' }) };
+  E.logoWord = new Word(E.logoL);
+  E.url = div(stage, { zIndex: 20, left: 0, width: '1440px', top: '1010px', height: '70px', overflow: 'hidden' });
+  E.urlTx = div(E.url, { left: 0, right: 0, top: 0, textAlign: 'center', fontSize: '42px', fontWeight: 600, letterSpacing: '-.5px', lineHeight: '70px' }, 'github.com/lusknchars/paper-raft');
+}
+
+// ─────────── flow (light, from the real export) ───────────
+function flowLayout() {
+  const kinds = ['equation', 'method', 'parameter', 'boundary_condition', 'result'];
+  const order = [...DATA.items].sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind));
+  const itemY = {}; order.forEach((it, i) => itemY[it.id] = 250 + i * 940 / (order.length - 1));
+  const methY = {}; DATA.methods.forEach((m, k) => methY[m.name] = 320 + k * 200);
+  const runs = DATA.methods.flatMap(m => DATA.runs.filter(r => r.method === m.name));
+  const runY = {}; runs.forEach((r, j) => runY[r.id] = 270 + j * 100);
+  return { order, itemY, methY, runs, runY, px: 110, py: 720, ix: 470, mx: 860, rx: 1090 };
+}
+const curve = (x1, y1, x2, y2) => { const m = (x1 + x2) / 2; return `M${x1} ${y1.toFixed(1)}C${m} ${y1.toFixed(1)} ${m} ${y2.toFixed(1)} ${x2} ${y2.toFixed(1)}`; };
+function buildFlow(s) {
+  const F = flowLayout(); const g = {};
+  const P = (d, c, o, w) => sv(s, 'path', { d, fill: 'none', stroke: c, 'stroke-opacity': o, 'stroke-width': w, pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 });
+  g.p2i = F.order.map(it => P(curve(F.px, F.py, F.ix, F.itemY[it.id]), '#0E0E10', .16, 1.6));
+  g.i2m = []; DATA.methods.forEach(m => m.implements.forEach(id => g.i2m.push(P(curve(F.ix, F.itemY[id], F.mx, F.methY[m.name]), '#0E0E10', .3, 1.8))));
+  g.m2r = F.runs.map(r => P(curve(F.mx, F.methY[r.method], F.rx - 14, F.runY[r.id]), '#CB2957', .85, 3));
+  g.nodes = [sv(s, 'circle', { cx: F.px, cy: F.py, r: 12, fill: '#0E0E10' }), ...DATA.methods.map(m => sv(s, 'circle', { cx: F.mx, cy: F.methY[m.name], r: 10, fill: '#0E0E10' })), ...F.runs.map(r => sv(s, 'circle', { cx: F.rx - 6, cy: F.runY[r.id], r: 9, fill: '#CB2957' }))];
+  g.F = F; E.flow = g;
+}
+function drawFlow(b, k0) {
+  const g = E.flow, d = b - k0;
+  g.p2i.forEach((p, i) => p.setAttribute('stroke-dashoffset', (1 - easeOut((d - i * 0.006) / 0.8)).toFixed(4)));
+  g.i2m.forEach((p, i) => p.setAttribute('stroke-dashoffset', (1 - easeOut((d - 0.5 - (i % 30) * 0.008) / 0.8)).toFixed(4)));
+  g.m2r.forEach((p, i) => p.setAttribute('stroke-dashoffset', (1 - easeOut((d - 1.0 - i * 0.04) / 0.6)).toFixed(4)));
+  g.nodes.forEach((n, i) => { const at = i === 0 ? 0 : i <= 5 ? 0.9 + i * 0.05 : 1.4 + (i - 6) * 0.04; const s = Math.max(0, track(d, 0, [[at, 1, 20, .5]]));
+    n.setAttribute('transform', around(+n.getAttribute('cx'), +n.getAttribute('cy'), s)); });
+}
+
+// ─────────── montage plan (beats are absolute) ───────────
+const fig = i => `assets/figs/${FIGS[i]}.png`, page = i => `assets/pages/${PAGES[i]}.png`;
+const MONTAGE = [
+  { at: 23.5, out: 24.5, src: fig(2), x: 720, y: 720, w: 1180, mark: 'loop', from: 'up' },
+  { at: 24.0, out: 25.0, src: page(5), x: 300, y: 420, w: 380, from: 'left' },
+  { at: 24.25, out: 25.0, src: page(9), x: 1140, y: 1030, w: 380, mark: 'tick', from: 'right' },
+  { at: 24.5, out: 25.5, src: fig(4), x: 720, y: 760, w: 1300, mark: 'under', from: 'down' },
+  { at: 25.0, out: 26.0, src: fig(0), x: 720, y: 700, w: 1000, mark: 'loop', from: 'zoom' },
+  { at: 25.5, out: 26.5, src: page(2), x: 360, y: 720, w: 420, from: 'left' },
+  { at: 25.65, out: 26.5, src: page(3), x: 720, y: 720, w: 420, from: 'down' },
+  { at: 25.8, out: 26.5, src: page(7), x: 1080, y: 720, w: 420, mark: 'tick', from: 'right' },
+  { at: 26.5, out: 27.5, src: fig(3), x: 720, y: 720, w: 760, mark: 'loop', from: 'zoom' },
+  { at: 27.0, out: 28.0, src: fig(1), x: 720, y: 760, w: 1300, mark: 'under', from: 'up' },
+  { at: 27.5, out: 28.6, src: page(10), x: 470, y: 560, w: 460, from: 'left' },
+  { at: 27.75, out: 28.6, src: fig(5), x: 1000, y: 980, w: 640, mark: 'loop', from: 'right' },
+  { at: 28.25, out: 29.4, src: page(0), x: 720, y: 720, w: 560, mark: 'tick', from: 'zoom' },
+];
+
+// ═════════════════════ seek ═════════════════════
+const W0 = {};  // precomputed words & morphs
+window.seek = async function (t) {
+  const b = t / B;
+  drawDither(t); drawHex(b);
+  actPage(b); actWord(b); actClaim(b); actTest(b); actDeck(b); actFlow(b); actMontage(b); actLogo(b);
+};
+
+// ── A/B/C: one page, the grid, flying out (0 – 4.2)
+const G = { w: 250, h: 323, gap: 24, cols: 5, rows: 3 };
+function tileXY(k) { // center tile (2,1) is the first page
+  const order = [7, 0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14];
+  const slot = order[k]; const c = slot % 5, r = Math.floor(slot / 5);
+  const gw = G.cols * G.w + (G.cols - 1) * G.gap, gh = G.rows * G.h + (G.rows - 1) * G.gap;
+  return [720 - gw / 2 + c * (G.w + G.gap), 720 - gh / 2 + r * (G.h + G.gap), c - 2, r - 1];
+}
+function placeImg(card, w, h, src, mode = 'page') {
+  const im = card.img;
+  if (mode === 'page') { const iw = w * 1.02; S(im, { width: px(iw), left: px((w - iw) / 2), top: px(-0.02 * iw) }); }
+  else { const n = FIGSZ[src]; const s = Math.min((w * 0.9) / n[0], (h * 0.9) / n[1]); S(im, { width: px(n[0] * s), left: px((w - n[0] * s) / 2), top: px((h - n[1] * s) / 2) }); }
+}
+function actPage(b) {
+  const on = b < 4.3; show(E.grid, on); show(E.paintA, on); show(E.inkTile, false); if (!on) return;
+  const zoomOut = track(b, 1.9, [[1.55, 2.6, 14, .9], [2.0, 1, 13, .75]]);          // push into the page, then punch out on the drop
+  const fly = b >= 3.4 ? expoIn(prog(b, 3.4, 0.7)) : 0;
+  E.tiles.forEach((t, k) => {
+    let [x, y, dc, dr] = tileXY(k); const center = k === 0;
+    const dist = Math.hypot(dc, dr);
+    const at = center ? 0 : 2.0 + dist * 0.12;
+    const s = center ? Math.max(0, track(b, 0, [[0, 1, 18, .55]])) : Math.max(0, track(b, 0, [[at, 1, 18, .6]]));
+    const vis = center ? true : b >= at; show(t, vis && !(center && b >= 3.55)); if (!vis) return;
+    // camera around the center tile
+    let cx = 720 + (x + G.w / 2 - 720) * zoomOut, cy = 720 + (y + G.h / 2 - 720) * zoomOut;
+    let w = G.w * zoomOut * s, h = G.h * zoomOut * s;
+    if (!center) { const ang = Math.atan2(dr, dc || 0.001); cx += Math.cos(ang) * 1500 * fly; cy += Math.sin(ang) * 1500 * fly; }
+    S(t, { left: px(cx - w / 2), top: px(cy - h / 2), width: px(w), height: px(h), borderRadius: px(10 * zoomOut) });
+    placeImg(t, w, h, t.fig, t.fig ? 'fig' : 'page');
+  });
+  // red loop around the first page's title
+  const z = zoomOut; const cx = 720, cy = 720 + (-G.h / 2 + 52) * z;
+  E.circleA.setAttribute('d', loop(cx, cy, 128 * z, 46 * z, 2)); E.circleA.setAttribute('stroke-width', (8 * z).toFixed(1));
+  draw(E.circleA, b < 3.4 ? easeOut(prog(b, 0.45, 0.8)) : 0);
+  // the center page floods ink, then becomes the word
+  if (b >= 3.3 && b < 3.62) {
+    show(E.inkTile, true); const k = easeOut(prog(b, 3.3, 0.25));
+    const w = G.w * k, h = G.h * k; S(E.inkTile, { left: px(720 - w / 2), top: px(720 - h / 2), width: px(w), height: px(h) });
+  }
+}
+
+// ── "paper" word, zoom through the counter of the "a" into page 4 (3.55 – 6.2)
+function actWord(b) {
+  const W = W0;
+  const onPaper = win(b, 3.55, 6.0);
+  const onTest = win(b, 8.35, 13.2);
+  if (onPaper) {
+    const m = ease(prog(b, 3.55, 0.75));
+    const [o, h] = W.rect2paper.at(m);
+    // zoom into the counter of "a"
+    const z = b >= 4.9 ? Math.pow(90, Math.pow(prog(b, 4.9, 1.1), 2.4)) : 1;
+    const tr = around(W.aHole.cx, W.aHole.cy, z);
+    E.word.set([o, h], tr, true);
+    E.holeClip.setAttribute('d', m >= 1 ? W.aHole.d : ''); E.holeClip.setAttribute('transform', tr);
+    // page 4 inside the counter, at the claim camera
+    const cam = claimCam(b);
+    E.p4in.setAttribute('transform', `translate(${cam.tx} ${cam.ty}) scale(${cam.s})`); show(E.p4in, m >= 1);
+  } else if (onTest) {
+    E.word.set(['', ''], '', false); show(E.p4in, false);
+  } else { E.word.set(['', ''], '', false); show(E.p4in, false); }
+
+}
+
+// ── claim on page 4: highlight, arrow, figures (5 – 9)
+const CLAIM = { x: 408, y: 1528, w: 560, h: 44 };
+function claimCam(b) {
+  const s = track(b, 1.25, [[5.6, 1.55, 10, .9]]);
+  const fx = CLAIM.x + CLAIM.w / 2, fy = CLAIM.y + CLAIM.h / 2;
+  const sy = track(b, 640, [[5.6, 470, 10, .9]]);
+  return { s, tx: 720 - fx * s, ty: sy - fy * s };
+}
+function actClaim(b) {
+  const on = win(b, 6.0, 9.6); show(E.p4L, on); show(E.p4Paint, on); E.figCards.forEach(c => show(c, false)); show(E.figCircle.parentNode.parentNode, on);
+  if (!on) return;
+  const cam = claimCam(b);
+  const away = track(b, 0, [[8.35, 1, 13, .95]]) * 4600;
+  S(E.p4, { transform: `translate(${px(cam.tx)}, ${px(cam.ty + away)}) scale(${cam.s.toFixed(5)})` });
+  const hx = cam.tx + CLAIM.x * cam.s, hy = cam.ty + (CLAIM.y + CLAIM.h / 2) * cam.s + away, hw = CLAIM.w * cam.s, hh = CLAIM.h * cam.s * 1.25;
+  E.hl.setAttribute('d', `M${hx} ${hy}L${hx + hw} ${hy}`); E.hl.setAttribute('stroke-width', hh.toFixed(1)); draw(E.hl, b < 8.35 ? ease(prog(b, 6.0, 0.7)) : 0);
+  // arrow from the claim to a figure
+  const ax = hx + hw * 0.55, ay = hy + hh * 0.7;
+  E.arrow.setAttribute('d', `M${ax} ${ay + 10}C${ax + 40} ${ay + 170} ${ax + 210} ${ay + 250} ${ax + 330} ${ay + 300}`);
+  E.arrowHead.setAttribute('d', `M${ax + 268} ${ay + 250}L${ax + 336} ${ay + 302}L${ax + 262} ${ay + 330}`);
+  draw(E.arrow, b < 8.35 ? easeOut(prog(b, 6.8, 0.45)) : 0); draw(E.arrowHead, b < 8.35 ? easeOut(prog(b, 7.2, 0.2)) : 0);
+  // figures, several at once
+  const spots = [[1080, 1010, 560], [300, 1060, 420], [1170, 290, 380]];
+  E.figCards.forEach((c, i) => {
+    const at = 7.0 + i * 0.25, s = Math.max(0, track(b, 0, [[at, 1, 18, .55]]));
+    show(c, b >= at); if (b < at) return;
+    const [x, y, w] = spots[i], n = FIGSZ[c.fig], h = w * n[1] / n[0] + 40;
+    const fly = track(b, 0, [[8.35, 1, 13, .95]]);
+    const yy = y + fly * 1700;
+    S(c, { left: px(x - w / 2), top: px(yy - h / 2), width: px(w), height: px(h), borderRadius: '14px', transform: `scale(${s.toFixed(4)}) rotate(${[-3, 4, -2][i]}deg)` });
+    placeImg(c, w, h, c.fig, 'fig');
+    if (i === 0) { E.figCircle.setAttribute('d', loop(x, yy, w * 0.58, h * 0.62, 5)); draw(E.figCircle, b < 8.35 ? easeOut(prog(b, 7.6, 0.6)) : 0); }
+  });
+  E.claimHL = { hx, hy, hw, hh };
+}
+
+// ── the highlight morphs into "test", checklist (8.35 – 13.4)
+function actTest(b) {
+  const on = win(b, 8.35, 13.6); show(E.testL, on); show(E.rowsL, win(b, 9.5, 13.6)); show(E.rowsPaint, win(b, 9.5, 13.6));
+  if (!on) return;
+  const m = ease(prog(b, 8.35, 0.7));
+  const up = track(b, 0, [[9.4, 1, 13, .8]]);
+  const out = track(b, 0, [[12.9, 1, 13, .95]]) * -1500;
+  const cx = 720, cy = lerp(720, 250, up) + out, s = lerp(1, 0.5, up);
+  E.test.o.setAttribute('fill-opacity', lerp(0.32, 1, m).toFixed(3));
+  E.test.set(W0.hl2test.at(m), `translate(0 ${out.toFixed(1)}) ${around(720, 720, 1)} translate(0 ${(lerp(720, 250, up) - 720).toFixed(1)}) ${around(720, 720, s)}`, true);
+  E.rows.forEach((r, i) => {
+    const at = 9.9 + i * 0.5;
+    const rise = 1 - track(b, 0, [[at, 1, 18, .8]]);
+    S(r.tx, { transform: `translateY(${px(rise * 130)})` }); S(r.m, { transform: `translateY(${px(out)})` });
+    r.mark.setAttribute('transform', `translate(0 ${out.toFixed(1)})`); r.strike.setAttribute('transform', `translate(0 ${out.toFixed(1)})`);
+    draw(r.mark, easeOut(prog(b, at + 0.15, 0.3)));
+    if (!r.ok) { if (!r.w) r.w = r.tx.offsetWidth; r.strike.setAttribute('d', `M330 ${r.y + 4}L${330 + r.w} ${r.y + 4}`); draw(r.strike, easeOut(prog(b, at + 0.3, 0.35))); }
+    else draw(r.strike, 0);
+  });
+}
+
+// ── terminal, then a 3D deck, flattening into a white sheet (12.9 – 17.4)
+function actDeck(b) {
+  const on = win(b, 12.9, 17.3); show(E.deck, on); if (!on) return;
+  const rise = 1 - track(b, 0, [[12.9, 1, 13, .8]]);
+  const cmd = 'raft prepare --arxiv 2608.27428';
+  const n = Math.floor(clamp((b - 13.35) / 1.2) * cmd.length), blink = Math.floor(b * 2) % 2 ? ' ' : '▌';
+  E.termTx.innerHTML = `<span style="color:#CB2957">$</span> ${cmd.slice(0, n)}${blink}`;
+  // 3D: the terminal tilts back, the deck of pages fans out beneath it
+  const tilt = ease(prog(b, 14.6, 0.9));
+  const flat = 0, ex = expoIn(prog(b, 16.3, 0.85));
+  const rx = lerp(0, 58, tilt) * (1 - flat), rz = lerp(0, -32, tilt) * (1 - flat), rot = (b - 14.6) * 4 * (1 - flat) * tilt;
+  const zoom = lerp(1, 0.86, tilt) * Math.pow(2.9, flat);
+  S(E.deckIn, { transform: `translateY(${px(rise * 1300)}) scale(${zoom.toFixed(4)}) rotateX(${rx.toFixed(2)}deg) rotateZ(${(rz + rot).toFixed(2)}deg)` });
+  S(E.term, { transform: `translateZ(${px(lerp(0, 330, tilt) + 1500 * ex)}) translateY(${px(-2200 * ex)})` });
+  const fan = ease(prog(b, 14.75, 0.9));
+  E.sheets.forEach((c, i) => {
+    show(c, b >= 14.6);
+    const z = -i * 34 * fan, dy = (i - 4.5) * 22 * fan, r = (i - 4.5) * 3.2 * fan * (1 - flat);
+    const sc = Math.max(0, track(b, 0, [[14.6 + i * 0.04, 1, 18, .62]]));
+    const ang = i * 2.4 + 0.6, ox = Math.cos(ang) * 2600 * ex, oy = Math.sin(ang) * 2600 * ex;
+    S(c, { transform: `translate3d(${px(ox)}, ${px(oy)}, ${px(z + 280 * fan + 900 * ex * (i % 3))}) translateY(${px(dy * (1 - flat))}) rotateZ(${(r + ex * (i - 5) * 30).toFixed(2)}deg) scale(${sc.toFixed(4)})` });
+    c.shade.style.opacity = (0.05 + i * 0.03 * fan).toFixed(3);
+  });
+  // a blank sheet lands on top and becomes the canvas
+  const land = track(b, 0, [[15.9, 1, 15, .8]]);
+  show(E.blank, false); if (0) S(E.blank, { transform: `translateZ(${px(330 + (1 - land) * 900)})`, boxShadow: `0 30px 60px rgba(14,14,16,${(0.18 * (1 - flat)).toFixed(3)})` });
+}
+
+// ── flow + numbers + "verified" (17.2 – 23.8)
+function actFlow(b) {
+  const on = win(b, 17.15, 24.6); show(E.flowL, on); show(E.numL, on); show(E.numCap, on); show(E.numPlate, false); show(E.verUnder.parentNode.parentNode, on);
+  if (!on) return;
+  const out = track(b, 0, [[23.5, 1, 13, .95]]) * -1500;
+  drawFlow(b, 17.2);
+  const zoom = track(b, 1.12, [[17.2, 1, 6, 1]]);
+  E.flowL.svg.setAttribute('style', `transform: translateY(${px(out)}) scale(${zoom.toFixed(4)}); transform-origin: 720px 720px; opacity: 1`);
+  // numbers punch on a white plate (left of center)
+  const keys = [19.0, 20.0, 21.0, 22.0];
+  let k = b < keys[1] ? 0 : b < keys[2] ? 1 : b < keys[3] ? 2 : 3;
+  const m = ease(prog(b, keys[k], 0.45));
+  const pop = Math.max(0, track(b, 0, [[19.0, 1, 18, .55]]));
+  let dPath;
+  if (k === 0) dPath = W0.n0.at(1); else dPath = W0.nums[k - 1].at(m);
+  show(E.numL, b >= 19.0);
+  const plateW = 1100 * pop, plateH = 470 * pop;
+  E.word2 = E.num;
+  E.num.set(dPath, `translate(0 ${out.toFixed(1)}) ${around(720, 690, pop)}`, b >= 19.0);
+  E.num.color(k === 3 ? 'var(--red)' : 'var(--ink)');
+  // white plate behind numbers so the lines don't run through them
+  show(E.numPlate, b >= 19.0); S(E.numPlate, { left: px(720 - plateW / 2), top: px(690 - plateH / 2 + 20 + out), width: px(plateW), height: px(plateH), borderRadius: '40px', boxShadow: '0 20px 60px rgba(14,14,16,.10)' });
+  E.caps.forEach((c, i) => { const inn = track(b, 0, [[keys[i] + 0.15, 1, 18, .8]]), o = track(b, 0, [[keys[i + 1], 1, 18, .9]]); S(c, { transform: `translateY(${px((1 - inn) * 90 - o * 90 + out)})` }); show(c, b >= keys[i] && b < keys[i + 1] + 0.5); });
+  // underline under "verified"
+  const vb = W0.verBB; E.verUnder.setAttribute('d', `M${vb.x1} ${vb.y2 + 40}C${vb.x1 + 200} ${vb.y2 + 26} ${vb.x2 - 200} ${vb.y2 + 54} ${vb.x2} ${vb.y2 + 34}`);
+  E.verUnder.setAttribute('transform', `translate(0 ${out.toFixed(1)})`);
+  draw(E.verUnder, easeOut(prog(b, 22.55, 0.45)));
+}
+
+// ── montage (23.5 – 29.4), converging into the mark (29 – 31)
+function actMontage(b) {
+  const on = win(b, 23.4, 31.2); show(E.mont, on); show(E.montPaint, on); if (!on) return;
+  const conv = ease(prog(b, 28.9, 1.1));
+  MONTAGE.forEach((m, i) => {
+    const c = E.shots[i]; const vis = b >= m.at && b < Math.max(m.out + 0.6, m === MONTAGE[MONTAGE.length - 1] ? 31.2 : 0);
+    show(c, vis); if (c.mark) show(c.mark, vis); if (!vis) return;
+    const isFig = m.src.includes('figs'); const key = m.src.split('/').pop().replace('.png', '');
+    const n = isFig ? FIGSZ[key] : [PAGE_W, PAGE_H]; const w = m.w, h = isFig ? w * n[1] / n[0] + 50 : w * PAGE_H / PAGE_W;
+    const inn = Math.max(0, track(b, 0, [[m.at, 1, 19, .62]])), outk = track(b, 0, [[m.out, 1, 16, .95]]);
+    let x = m.x, y = m.y, s = 1;
+    const off = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0], zoom: [0, 0] }[m.from];
+    if (m.from === 'zoom') s = lerp(0.2, 1, inn); else { x += off[0] * 1500 * (1 - inn); y += off[1] * 1500 * (1 - inn); }
+    // leave: keep moving the same way it came
+    if (m.from === 'zoom') s *= 1 + outk * 3; else { x -= off[0] * 1700 * outk; y -= off[1] * 1700 * outk; }
+    const last = i === MONTAGE.length - 1;
+    if (last) { const ms = lerp(1, 0.0, conv); s = Math.max(0, track(b, 0, [[m.at, 1, 19, .62]])) * (1 - conv); y = lerp(y, 690, conv); }
+    S(c, { left: px(x - w / 2), top: px(y - h / 2), width: px(w), height: px(h), borderRadius: '16px', transform: `scale(${Math.max(0, s).toFixed(4)})` });
+    if (isFig) placeImg(c, w, h, key, 'fig'); else { S(c.img, { width: px(w), left: 0, top: 0 }); }
+    if (c.mark) {
+      const sw = w * s, sh = h * s, k = easeOut(prog(b, m.at + 0.25, 0.35));
+      let d;
+      if (m.mark === 'loop') d = loop(x, y, sw * 0.56, sh * 0.6, i);
+      else if (m.mark === 'under') d = `M${x - sw * 0.42} ${y + sh * 0.56}C${x - sw * 0.1} ${y + sh * 0.5} ${x + sw * 0.15} ${y + sh * 0.62} ${x + sw * 0.42} ${y + sh * 0.54}`;
+      else d = tick(x + sw * 0.18, y - sh * 0.38, Math.min(160, sw * 0.4));
+      c.mark.setAttribute('d', d); draw(c.mark, k * (last ? 1 - conv : 1));
+    }
+  });
+}
+
+// ── logo: the Paperraft wordmark (Iowan Old Style, -0.04em), born from an ink bar (29.4 – 35)
+function actLogo(b) {
+  const on = b >= 29.4; show(E.logoL, on); show(E.url, on); Object.values(E.mk).forEach(p => show(p, false)); if (!on) return;
+  const L = W0.logo;
+  // an ink line grows out of the collapsing image, then the wordmark rises out of it on the hit and the line pulls in
+  const g = Math.max(0, track(b, 0, [[29.5, 1, 15, .7]])) * (1 - ease(prog(b, 31.05, 0.5)));
+  const bw = L.barW * g;
+  E.logoBar.setAttribute('x', (720 - bw / 2).toFixed(1)); E.logoBar.setAttribute('width', Math.max(0, bw).toFixed(1)); show(E.logoBar, bw > 0.5);
+  const rise = 1 - track(b, 0, [[30.95, 1, 15, .78]]);
+  E.logoWord.set(W0.logoRings, `translate(0 ${(rise * L.h).toFixed(1)})`, b >= 30.95);
+  S(E.urlTx, { transform: `translateY(${px((1 - track(b, 0, [[32.0, 1, 18, .8]])) * 80)})` });
+}
+
+// ═════════════════════ boot ═════════════════════
+window.ready = (async () => {
+  DATA = await (await fetch('data.json')).json();
+  FONT = await new Promise((res, rej) => opentype.load('assets/fonts/BeVietnamPro-ExtraBold.ttf', (e, f) => e ? rej(e) : res(f)));
+  await document.fonts.load('600 50px BVP'); await document.fonts.load('700 78px BVP'); await document.fonts.load('500 50px "Geist Mono"'); await document.fonts.ready;
+  await Promise.all(FIGS.map(f => new Promise(r => { const i = new Image(); i.onload = () => { FIGSZ[f] = [i.naturalWidth, i.naturalHeight]; r(); }; i.src = `assets/figs/${f}.png`; })));
+  build();
+  // words
+  const paper = fit('paper', 1200, 420, 720, 700);
+  W0.aHole = paper.holes.find(h => h.cx > paper.bb.x1 + (paper.bb.x2 - paper.bb.x1) * 0.2 && h.cx < paper.bb.x1 + (paper.bb.x2 - paper.bb.x1) * 0.45) || paper.holes[1];
+  const r0 = { outers: [rectRing(720 - G.w / 2, 720 - G.h / 2, G.w, G.h)], holes: [] };
+  W0.rect2paper = new Morph(r0, paper);
+  const test = fit('test', 1000, 420, 720, 720);
+  // the highlight bar on page 4 at its final camera (same numbers as claimCam settles to)
+  const s = 1.55, hx = 720 - (CLAIM.x + CLAIM.w / 2) * s + CLAIM.x * s, hy = 470, hw = CLAIM.w * s, hh = CLAIM.h * s * 1.25;
+  W0.hl2test = new Morph({ outers: [rectRing(hx, hy - hh / 2, hw, hh)], holes: [] }, test);
+  const N = DATA.numbers;
+  const words = [`${N.runsPass}/${N.runs}`, `${N.methodsVerified}/${N.methods}`, N.exactError.toExponential(1), 'verified'].map(w => fit(w, 960, 330, 720, 690));
+  W0.n0 = new Morph(words[0], words[0]);
+  W0.nums = [new Morph(words[0], words[1]), new Morph(words[1], words[2]), new Morph(words[2], words[3])];
+  W0.verBB = words[3].bb;
+  // logo: the Paperraft wordmark
+  SERIF = await new Promise((res, rej) => opentype.load('assets/fonts/private/IowanOldStyle-Roman.ttf', (e, f) => e ? rej(e) : res(f)));
+  const lw = (() => { const bb = SERIF.getPath('Paperraft', 0, 0, 300, { tracking: -40 }).getBoundingBox(); return bb.x2 - bb.x1; })();
+  const ls = 300 * Math.min(1, 1000 / lw);
+  const logoWord = ringsOf('Paperraft', ls, 720, 700, SERIF, { tracking: -40 });
+  W0.logo = { barW: (logoWord.bb.x2 - logoWord.bb.x1) * 0.92, barY: 700 + (logoWord.bb.y2 - logoWord.bb.y1) * 0.12 };
+  W0.logoRings = [logoWord.outers.map(r => r.d).join(''), logoWord.holes.map(r => r.d).join('')];
+  W0.logo.h = logoWord.bb.y2 - logoWord.bb.y1 + 30; W0.logo.barY = logoWord.bb.y2 + 12;
+  const cp = sv(E.logoL.svg.querySelector('defs'), 'clipPath', { id: 'logoclip', clipPathUnits: 'userSpaceOnUse' }); sv(cp, 'rect', { x: 0, y: 0, width: 1440, height: W0.logo.barY - 7 });
+  const clipG = sv(E.logoL.svg, 'g', { 'clip-path': 'url(#logoclip)' }); clipG.appendChild(E.logoWord.g);
+  E.logoBar = sv(E.logoL.svg, 'rect', { x: 720, y: W0.logo.barY - 7, width: 0, height: 14, rx: 7, fill: 'var(--ink)' });
+  S(E.url, { top: px(logoWord.bb.y2 + 70) });
+  await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
+  await window.seek(0);
+  if (!new URLSearchParams(location.search).has('render')) { const t0 = performance.now(); const f = async () => { await window.seek(((performance.now() - t0) / 1000) % window.DURATION); requestAnimationFrame(f); }; f(); }
+})();
+</script>
+</body>
+</html>

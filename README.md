@@ -7,6 +7,7 @@ Skills for Claude Code that turn a product into the assets that sell it.
 | Skill | What it makes |
 |---|---|
 | [Motion Market](plugins/motion-market/skills/motion-market/SKILL.md) | A UI motion video of your app. One shape morphs through your real UI states, a cursor drives each change, and it's cut to music. You get a seamless loop at 60 fps: square, vertical or landscape, plus a social MP4, a README GIF and a poster. |
+| [Brand Ad](plugins/brand-ad/skills/brand-ad/SKILL.md) | A fast 10–15 s ad. Words morph into words and numbers, real images fly in with strokes painted over them, your site's own background runs underneath, and the logo rises on the song's biggest hit. Each format (square, 4:5, 9:16, 16:9) is laid out at its own size. |
 
 ## Install
 
@@ -17,7 +18,11 @@ In Claude Code:
 /plugin install motion-market@distribution-skills
 ```
 
-Or copy `plugins/motion-market/skills/motion-market` into `~/.claude/skills/`.
+```
+/plugin install brand-ad@distribution-skills
+```
+
+Or copy `plugins/<skill>/skills/<skill>` into `~/.claude/skills/`.
 
 ## Your first video
 
@@ -64,6 +69,14 @@ The camera re-frames the same scene for each format, so you can ask for "the ver
 - **`upload-share`**: dark and vertical, 4 bars: upload → drag a file onto a dropzone → progress → share toggle → copy link → toast.
 
 Start from one with `sh scripts/new-project.sh my-video upload-share`, run from the skill folder.
+
+## Your first ad
+
+Open Claude Code in your product's repo (or its site's) and ask:
+
+> Make a 15-second ad for our launch that ends on our logo.
+
+Claude reads your site's fonts, colors and background code, asks for the logo, finds a song with a big hit, and shows a beat-by-beat shot list and four stills before rendering. Every number on screen has to come from real output. Each render ends with a pop scan that flags any frame where something jumps instead of morphing.
 
 ## Requirements
 

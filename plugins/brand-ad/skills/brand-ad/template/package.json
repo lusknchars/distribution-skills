@@ -1,0 +1,10 @@
+{
+  "name": "brand-ad",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "beats": "node render.mjs beats",
+    "render": "node render.mjs cues && python3 tools/mix.py && node render.mjs video && sh encode.sh"
+  },
+  "dependencies": { "playwright": "^1.63.0" }
+}
